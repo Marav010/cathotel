@@ -1,0 +1,213 @@
+/* ═══════════════════════════════════════════════════════════════
+   App.css  —  Component-specific styles
+   Shared animations/utilities อยู่ใน index.css แล้ว
+   ไฟล์นี้มีเฉพาะ styles ที่ใช้ใน component เดียว
+═══════════════════════════════════════════════════════════════ */
+
+
+/* ─────────────────────────────────────────
+   BookingForm
+───────────────────────────────────────── */
+
+@keyframes jj-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes jj-cat-card {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.form-slide-up { animation: jj-slide-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.cat-card-in   { animation: jj-cat-card 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* Input — ขนาดใหญ่กว่า jj-input เล็กน้อยสำหรับฟอร์ม */
+.booking-input {
+  width: 100%;
+  padding: .875rem 1rem;
+  background: #FDFBFA;
+  border-radius: 1rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .875rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+.booking-input:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+.booking-input::placeholder { color: #C4A99A; font-weight: 600; }
+input[type="date"].booking-input { color-scheme: light; }
+
+.room-select {
+  width: 100%;
+  padding: .875rem 2.25rem .875rem 1rem;
+  background: #FDFBFA;
+  border-radius: 1rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .875rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.room-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+
+.section-label {
+  display: block;
+  font-size: .85rem;
+  font-weight: 900;
+  color: #885E43;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  margin-bottom: .5rem;
+  margin-left: 2px;
+}
+
+
+/* ─────────────────────────────────────────
+   HistoryTable
+───────────────────────────────────────── */
+
+@keyframes jj-row-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.history-fade { animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; } /* reuse fadeUp from index.css */
+.row-in       { animation: jj-row-in 0.25s ease forwards; }
+
+.ht-input {
+  width: 100%;
+  padding: .5rem .75rem;
+  background: white;
+  border-radius: .75rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .8rem;
+  transition: border-color .2s;
+}
+.ht-input:focus { border-color: #885E43; }
+
+.ht-select {
+  width: 100%;
+  padding: .5rem 1.75rem .5rem .75rem;
+  background: white;
+  border-radius: .75rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .8rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.ht-select:focus { border-color: #885E43; }
+
+/* Table row striping */
+tbody tr:nth-child(even) { background: #FDFBFA; }
+tbody tr:hover           { background: #FDF6F0 !important; }
+
+
+/* ─────────────────────────────────────────
+   CustomerDatabase
+───────────────────────────────────────── */
+
+@keyframes jj-card-in-scale {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.cdb-fade { animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }   /* reuse fadeUp */
+.card-in  { animation: jj-card-in-scale 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Use jj-input base from index.css + these aliases */
+.cdb-input {
+  width: 100%;
+  padding: .625rem .875rem;
+  background: #FDFBFA;
+  border-radius: .875rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .825rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+.cdb-input:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+.cdb-input::placeholder { color: #C4A99A; font-weight: 600; }
+
+.cdb-label {
+  display: block;
+  font-size: .65rem;
+  font-weight: 900;
+  color: #885E43;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  margin-bottom: .35rem;
+}
+
+
+/* ─────────────────────────────────────────
+   ReportSummary
+───────────────────────────────────────── */
+
+@keyframes jj-bar-grow {
+  from { width: 0; }
+  to   { width: var(--bar-w); }
+}
+
+.rpt-fade { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }  /* reuse fadeUp */
+.bar-grow { animation: jj-bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+.rpt-select {
+  padding: .5rem 2rem .5rem .85rem;
+  background: white;
+  border: 1.5px solid #efebe9;
+  border-radius: .875rem;
+  outline: none;
+  font-weight: 800;
+  color: #885E43;
+  font-size: .75rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.rpt-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+
+
+/* ─────────────────────────────────────────
+   CalendarView (admin) + UserCalendar
+   NOTE: FullCalendar base theme อยู่ใน index.css
+   ใส่ได้ที่นี่เฉพาะ override พิเศษ ถ้ามี
+───────────────────────────────────────── */
+
+/* Admin-only: animate room status cards */
+@keyframes jj-admin-card-slide {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-card { animation: jj-admin-card-slide 0.35s ease forwards; }
+
+/* Modal in (slightly tighter than modalPop) */
+@keyframes jj-modal-in {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-in { animation: jj-modal-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }

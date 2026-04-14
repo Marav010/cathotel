@@ -1,0 +1,560 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────
+   Fonts
+───────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;600;700&family=Bebas+Neue&display=swap');
+
+/* ─────────────────────────────────────────
+   Design Tokens
+───────────────────────────────────────── */
+:root {
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  --color-dark-wood:    #372C2E;
+  --color-bronze:       #885E43;
+  --color-caramel:      #DE9E48;
+  --color-latte:        #C39A7A;
+  --color-cream:        #FDFBFA;
+  --color-beige-border: #DBD0C5;
+}
+
+/* ─────────────────────────────────────────
+   Base
+───────────────────────────────────────── */
+body {
+  margin: 0;
+  background-color: var(--color-cream);
+  color: var(--color-dark-wood);
+}
+
+/* ─────────────────────────────────────────
+   Scrollbar
+───────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--color-latte); border-radius: 10px; }
+
+/* ─────────────────────────────────────────
+   Sidebar
+───────────────────────────────────────── */
+aside h1, aside span, nav span { color: var(--color-dark-wood); }
+
+/* ─────────────────────────────────────────
+   SHARED ANIMATIONS
+   ใช้ได้ทุก component — ไม่ต้องประกาศซ้ำ
+───────────────────────────────────────── */
+
+/* Loading cat */
+@keyframes catBounce {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50%       { transform: translateY(-12px) rotate(5deg); }
+}
+
+/* Modal entrance */
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.93) translateY(14px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Floating paw decorations in hero headers */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-8deg); opacity: 0.06; }
+  50%       { transform: translateY(-8px) rotate(4deg); opacity: 0.1; }
+}
+
+/* Card/row slide-in on load */
+@keyframes cardSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Page-level fade-up */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────────────────────────────────
+   SHARED UTILITY CLASSES
+───────────────────────────────────────── */
+
+/* Modal pop — ใช้ทุก modal ในทุก component */
+.jj-modal-pop  { animation: modalPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* Paw float decorations in hero headers */
+.paw-float     { animation: float 6s ease-in-out infinite; }
+.paw-float-2   { animation: float 8s ease-in-out infinite reverse; animation-delay: 2s; }
+
+/* Card slide-in (room status cards, customer cards) */
+.jj-card-in    { animation: cardSlideIn 0.35s ease forwards; }
+
+/* Page fade-up wrapper */
+.jj-page-fade  { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Bebas Neue number display — ใช้กับตัวเลขสำคัญทุก component */
+.f-number {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+/* Gold divider — เส้นคั่น gradient ทอง */
+.divider-gold {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #C39A7A 30%, #DE9E48 50%, #C39A7A 70%, transparent);
+}
+
+/* ─────────────────────────────────────────
+   SHARED INPUT / SELECT STYLES
+   Base ที่ทุก component inherit ต่อได้
+───────────────────────────────────────── */
+.jj-input {
+  width: 100%;
+  padding: .625rem .875rem;
+  background: #FDFBFA;
+  border-radius: .875rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: .825rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+.jj-input:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+.jj-input::placeholder { color: #C4A99A; font-weight: 600; }
+input[type="date"].jj-input { color-scheme: light; }
+
+.jj-select {
+  padding: .55rem 2rem .55rem .85rem;
+  background: white;
+  border: 1.5px solid #efebe9;
+  border-radius: .875rem;
+  outline: none;
+  font-weight: 800;
+  color: #885E43;
+  font-size: .75rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.jj-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136, 94, 67, .08);
+}
+
+.jj-label {
+  display: block;
+  font-size: .65rem;
+  font-weight: 900;
+  color: #885E43;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  margin-bottom: .35rem;
+}
+
+/* ─────────────────────────────────────────
+   FULLCALENDAR SHARED THEME
+   ใช้ทั้ง .jj-calendar (UserCalendar)
+   และ .admin-calendar (CalendarView)
+   ต่างกันแค่ wrapper class บน <div>
+───────────────────────────────────────── */
+.jj-calendar .fc,
+.admin-calendar .fc {
+  font-family: 'IBM Plex Sans Thai', 'Sarabun', sans-serif;
+  max-width: 100% !important;
+  background: white;
+  border-radius: 1.5rem;
+  padding: 1rem;
+  box-shadow: 0 10px 30px rgba(55, 44, 46, .05);
+}
+
+.jj-calendar .fc-toolbar.fc-header-toolbar,
+.admin-calendar .fc-toolbar.fc-header-toolbar {
+  margin-bottom: 1.5rem;
+  padding: 0 .5rem;
+}
+
+.jj-calendar .fc-toolbar-title,
+.admin-calendar .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #372C2E;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.jj-calendar .fc-button,
+.admin-calendar .fc-button {
+  background: #FDFBFA !important;
+  border: 1.5px solid #DBD0C5 !important;
+  color: #372C2E !important;
+  border-radius: .75rem !important;
+  font-weight: 800 !important;
+  font-size: .75rem !important;
+  padding: .45rem .85rem !important;
+  transition: all .2s !important;
+  box-shadow: none !important;
+}
+.jj-calendar .fc-button:hover,
+.admin-calendar .fc-button:hover {
+  background: #372C2E !important;
+  color: #DE9E48 !important;
+  border-color: #372C2E !important;
+}
+
+.jj-calendar .fc-today-button,
+.admin-calendar .fc-today-button {
+  background: #885E43 !important;
+  color: white !important;
+  border-color: #885E43 !important;
+}
+.jj-calendar .fc-today-button:hover,
+.admin-calendar .fc-today-button:hover {
+  background: #5D4037 !important;
+  border-color: #5D4037 !important;
+  color: white !important;
+}
+
+.jj-calendar .fc-daygrid-day,
+.admin-calendar .fc-daygrid-day {
+  border-color: #f0ece8 !important;
+  transition: background .15s;
+  cursor: pointer;
+}
+.jj-calendar .fc-daygrid-day:hover,
+.admin-calendar .fc-daygrid-day:hover { background: #fdf8f5 !important; }
+
+.jj-calendar .fc-day-today,
+.admin-calendar .fc-day-today { background: #fff8f0 !important; }
+
+.jj-calendar .fc-day-today .fc-daygrid-day-number,
+.admin-calendar .fc-day-today .fc-daygrid-day-number {
+  background: #372C2E;
+  color: #DE9E48 !important;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.jj-calendar .fc-daygrid-day-number,
+.admin-calendar .fc-daygrid-day-number {
+  font-size: .8rem;
+  font-weight: 700;
+  color: #5D4037;
+  padding: 6px 8px;
+}
+
+.jj-calendar .fc-col-header-cell-cushion,
+.admin-calendar .fc-col-header-cell-cushion {
+  font-size: .7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: #A1887F;
+  padding: 10px 4px;
+}
+
+.jj-calendar .fc-event,
+.admin-calendar .fc-event {
+  border-radius: 6px !important;
+  font-size: .68rem !important;
+  font-weight: 700 !important;
+  padding: 1px 5px !important;
+  letter-spacing: .02em;
+  border: none !important;
+  cursor: pointer;
+  margin-bottom: 1px !important;
+  transition: opacity .15s, transform .15s;
+}
+.jj-calendar .fc-event:hover,
+.admin-calendar .fc-event:hover { opacity: .85; transform: translateY(-1px); }
+
+.jj-calendar .fc-more-link,
+.admin-calendar .fc-more-link {
+  font-size: .65rem;
+  font-weight: 800;
+  color: #885E43;
+}
+
+/* "+ ดูเพิ่มเติม" button */
+.jj-calendar .fc-daygrid-more-link,
+.admin-calendar .fc-daygrid-more-link {
+  background-color: #FDF8F5 !important;
+  color: #885E43 !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  margin-top: 2px !important;
+  display: block !important;
+  text-align: center !important;
+  border: 1px solid #efebe9 !important;
+  transition: all 0.2s ease;
+}
+.jj-calendar .fc-daygrid-more-link:hover,
+.admin-calendar .fc-daygrid-more-link:hover {
+  background-color: #885E43 !important;
+  color: white !important;
+  text-decoration: none !important;
+}
+
+.jj-calendar .fc-scrollgrid,
+.admin-calendar .fc-scrollgrid {
+  border-radius: 1rem;
+  overflow: hidden;
+  border-color: #efebe9 !important;
+}
+.jj-calendar .fc-scrollgrid-section > *,
+.admin-calendar .fc-scrollgrid-section > * { border-color: #efebe9 !important; }
+
+.jj-calendar .fc td, .jj-calendar .fc th,
+.admin-calendar .fc td, .admin-calendar .fc th { border-color: #f0ece8 !important; }
+
+/* Popover */
+.fc-popover              { border-radius: 20px !important; box-shadow: 0 20px 25px -5px rgb(0 0 0 / .1) !important; border: 1px solid #DBD0C5 !important; overflow: hidden !important; }
+.fc-popover-header       { background: #372C2E !important; color: white !important; padding: 12px 16px !important; font-weight: bold !important; }
+.fc-popover-body         { padding: 10px !important; background-color: white !important; }
+
+.fc-daygrid-event-h-harness { margin-bottom: 2px !important; }
+.fc-scroller                { overflow: visible !important; }
+.fc-theme-standard td,
+.fc-theme-standard th       { border-color: #efebe9 !important; }
+
+/* ─────────────────────────────────────────
+   BOOKING FORM
+───────────────────────────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.form-slide-up { animation: slideUp 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+@keyframes catCard {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cat-card-in { animation: catCard 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+.booking-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: #FDFBFA;
+  border-radius: 1rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.booking-input:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136,94,67,0.08);
+}
+.booking-input::placeholder { color: #C4A99A; font-weight: 600; }
+input[type="date"].booking-input { color-scheme: light; }
+
+.room-select {
+  width: 100%;
+  padding: 0.875rem 2.25rem 0.875rem 1rem;
+  background: #FDFBFA;
+  border-radius: 1rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: 0.875rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.room-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136,94,67,0.08);
+}
+
+.section-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #885E43;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.5rem;
+  margin-left: 2px;
+}
+
+/* ─────────────────────────────────────────
+   HISTORY TABLE
+───────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.history-fade { animation: fadeSlideIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.row-in { animation: rowIn 0.25s ease forwards; }
+
+.ht-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: 0.8rem;
+  transition: border-color 0.2s;
+}
+.ht-input:focus { border-color: #885E43; }
+
+.ht-select {
+  width: 100%;
+  padding: 0.5rem 1.75rem 0.5rem 0.75rem;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: 0.8rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.ht-select:focus { border-color: #885E43; }
+
+.filter-select {
+  padding: 0.55rem 2rem 0.55rem 0.85rem;
+  background: white;
+  border: 1.5px solid #efebe9;
+  border-radius: 0.875rem;
+  outline: none;
+  font-weight: 700;
+  color: #885E43;
+  font-size: 0.75rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.filter-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136,94,67,0.08);
+}
+
+tbody tr:nth-child(even) { background: #FDFBFA; }
+tbody tr:hover { background: #FDF6F0 !important; }
+
+/* ─────────────────────────────────────────
+   CUSTOMER DATABASE
+───────────────────────────────────────── */
+@keyframes cardIn {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cdb-fade { animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+.card-in  { animation: cardIn 0.3s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+.cdb-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: #FDFBFA;
+  border-radius: 0.875rem;
+  border: 1.5px solid #efebe9;
+  outline: none;
+  font-weight: 700;
+  color: #372C2E;
+  font-size: 0.825rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+.cdb-input:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136,94,67,.08);
+}
+.cdb-input::placeholder { color: #C4A99A; font-weight: 600; }
+
+.cdb-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: #885E43;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  margin-bottom: .35rem;
+}
+
+/* ─────────────────────────────────────────
+   REPORT SUMMARY
+───────────────────────────────────────── */
+@keyframes rptFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rpt-fade { animation: rptFadeUp 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+@keyframes barGrow {
+  from { width: 0; }
+  to   { width: var(--bar-w); }
+}
+.bar-grow { animation: barGrow 0.9s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+.rpt-select {
+  padding: 0.5rem 2rem 0.5rem 0.85rem;
+  background: white;
+  border: 1.5px solid #efebe9;
+  border-radius: 0.875rem;
+  outline: none;
+  font-weight: 800;
+  color: #885E43;
+  font-size: 0.75rem;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.rpt-select:focus {
+  border-color: #885E43;
+  box-shadow: 0 0 0 3px rgba(136,94,67,.08);
+}
+
+/* ─────────────────────────────────────────
+   CALENDAR VIEW (Admin) — local overrides
+   (base styles already in FULLCALENDAR block above)
+───────────────────────────────────────── */
+.animate-card { animation: cardSlideIn 0.35s ease forwards; }
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-in { animation: modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+.admin-calendar .fc-daygrid-day { cursor: pointer; }
+
+/* ─────────────────────────────────────────
+   USER CALENDAR — local overrides
+───────────────────────────────────────── */
+.jj-calendar .fc-day-selected { background: #fff3e6 !important; }
+
+/* ─────────────────────────────────────────
+   USER HOME
+───────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.lb-anim { animation: fadeIn 0.2s ease forwards; }
+.f-display { font-family: 'Cormorant Garamond', serif; }
+.f-body    { font-family: 'IBM Plex Sans Thai', 'Sarabun', sans-serif; }
+.room-img-wrap img { transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94); }
+.room-img-wrap:hover img { transform: scale(1.05); }
