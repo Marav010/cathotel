@@ -87,6 +87,28 @@ export default function AIAssistant() {
     };
   };
 
+  const isDataQuestion = (msg) => {
+  const keywords = ['บ้าน', 'จอง', 'ลูกค้า', 'รายได้', 'เช็คอิน', 'เช็คเอ้าท์'];
+  return keywords.some(k => msg.includes(k));
+};
+  if (!isDataQuestion(msg)) {
+  // 👉 คำถามทั่วไป (ไม่ต้องโหลด DB)
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { ... },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'คุณเป็นผู้ช่วยโรงแรมแมว ตอบคำถามทั่วไปได้ เป็นกันเอง'
+        },
+        { role: 'user', content: msg }
+      ],
+      max_tokens: 300,
+    }),
+  });
+}
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
     const todayCI = data.bookings.filter(b => b.startDate === data.todayISO);
@@ -109,16 +131,11 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 
 กรุณา:
 - ตอบเป็นภาษาไทยเท่านั้น
-- ห้ามแสดงโค้ดหรือข้อมูลดิบจากระบบ
-- ห้ามแสดง JSON หรือรูปแบบข้อมูลทางเทคนิค
-- ใช้ข้อมูลจริงจากระบบในการตอบ
-- สรุปข้อมูลให้ชัดเจน กระชับ เข้าใจง่าย
-- ถ้าไม่พบข้อมูล ให้บอกตามตรง
-- ใช้ emoji เล็กน้อยเพื่อให้น่าอ่าน
-- ถ้ามีตัวเลขให้แสดงให้ชัดเจน
-- ให้สรุปเป็นภาษาคนทั่วไป
-- ต้องแสดงข้อมูลให้ครบทุกรายการ ห้ามตัด
-- ถ้ามีหลายรายการ ให้แสดงครบทุกบ้าน
+- ถ้าคำถามเกี่ยวกับข้อมูลโรงแรม → ใช้ข้อมูลจริงจากระบบ
+- ถ้าเป็นคำถามทั่วไป → สามารถตอบตามความรู้ทั่วไปได้
+- ห้ามแสดงโค้ดหรือ JSON
+- สรุปให้อ่านง่ายเหมือนพนักงานโรงแรม
+- ถ้ามีหลายรายการ ให้แสดงครบ
 - ตอบเหมือนพนักงานโรงแรม`;
   };
 
