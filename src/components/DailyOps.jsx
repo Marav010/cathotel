@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   LogIn, LogOut, Clock, PawPrint, CheckCircle2, Circle,
-  CalendarDays, RefreshCw, Loader2, Sun, Moon, Home,
+  RefreshCw, Loader2, Sun, Moon, Home,
   ArrowRightCircle, AlarmClock, Bell, BellRing, CheckCheck,
 } from 'lucide-react';
 
 const todayStr = () => new Date().toLocaleDateString('sv-SE');
 const addDays  = (ds, n) => { const d = new Date(ds); d.setDate(d.getDate()+n); return d.toLocaleDateString('sv-SE'); };
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}) : '-';
-const fmtShortDate = (d) => d ? new Date(d).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+const fmtShort = (d) => d ? new Date(d).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
 const nowTime  = () => new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false});
 
 const ROOM_COLOR = {
@@ -52,8 +52,10 @@ export default function DailyOps() {
     setAllBookings(bData);
     if(!bData.length){setLoading(false);return;}
     const ids=bData.map(b=>b.id);
+
     const {data:oData}=await supabase.from('booking_ops').select('*').in('booking_id',ids);
     const om={}; (oData||[]).forEach(o=>{ om[o.booking_id]=o; }); setOpsMap(om);
+
     const {data:pData}=await supabase.from('booking_playtime').select('*').in('booking_id',ids).eq('play_date',date).order('released_at');
     const pm={}; ids.forEach(id=>{ pm[id]={morning:null,evening:null}; });
     (pData||[]).forEach(p=>{
@@ -120,20 +122,33 @@ export default function DailyOps() {
   };
 
   const tom = addDays(date,1);
-  const checkinToday     = allBookings.filter(b=>b.start_date===date && !opsMap[b.id]?.checked_in);
-  const checkinTomorrow  = allBookings.filter(b=>b.start_date===tom  && !opsMap[b.id]?.checked_in);
-  const checkoutToday    = allBookings.filter(b=>b.end_date===date   && !opsMap[b.id]?.checked_out);
-  const checkoutTomorrow = allBookings.filter(b=>b.end_date===tom    && !opsMap[b.id]?.checked_out);
-  const checkedInNow     = allBookings.filter(b=>opsMap[b.id]?.checked_in && !opsMap[b.id]?.checked_out);
-  const notPlayedMorning = checkedInNow.filter(b=>!playMap[b.id]?.morning);
-  const notPlayedEvening = checkedInNow.filter(b=>!playMap[b.id]?.evening);
-  const bookingsDetail   = allBookings.filter(b=>{
+
+  // ===== FILTER RULES =====
+  // บ้านที่เช็คเอ้าแล้ว (checked_out = true) → ไม่แสดงในทุก section
+  const notCheckedOut = (b) => !opsMap[b.id]?.checked_out;
+
+  // Notifications: เฉพาะที่ยังไม่เช็คเอ้าท์
+  const checkinToday     = allBookings.filter(b => b.start_date===date && !opsMap[b.id]?.checked_in && notCheckedOut(b));
+  const checkinTomorrow  = allBookings.filter(b => b.start_date===tom  && !opsMap[b.id]?.checked_in && notCheckedOut(b));
+  const checkoutToday    = allBookings.filter(b => b.end_date===date   && notCheckedOut(b));
+  const checkoutTomorrow = allBookings.filter(b => b.end_date===tom    && notCheckedOut(b));
+
+  // บ้านที่เช็คอินแล้วและยังไม่เช็คเอ้าท์ (กำลังพักอยู่)
+  const checkedInNow     = allBookings.filter(b => opsMap[b.id]?.checked_in && notCheckedOut(b));
+
+  // Play: เฉพาะบ้านที่เช็คอินแล้วและยังไม่เช็คเอ้าท์
+  const notPlayedMorning = checkedInNow.filter(b => !playMap[b.id]?.morning);
+  const notPlayedEvening = checkedInNow.filter(b => !playMap[b.id]?.evening);
+
+  // Detail cards: เฉพาะที่ยังไม่เช็คเอ้าท์
+  const bookingsDetail = allBookings.filter(b => {
+    if (!notCheckedOut(b)) return false;
     const ci=b.start_date>=date&&b.start_date<=tom;
     const co=b.end_date>=date&&b.end_date<=tom;
     return ci||co;
   });
 
-  // Notification card
+  // Notification Card component
   const NotifCard=({id,icon,title,count,color,bg,border,items,emptyMsg,urgent})=>{
     const isOpen=expandedNotif===id;
     return(
@@ -149,14 +164,12 @@ export default function DailyOps() {
             <p className="text-xs font-black text-[#372C2E]">{title}</p>
             {count>0
               ?<p className="text-[11px] font-bold mt-0.5" style={{color}}>{count} บ้าน</p>
-              :<p className="text-[11px] font-bold text-[#bbb] mt-0.5">ไม่มี</p>}
+              :<p className="text-[11px] font-bold text-green-600 mt-0.5">✓ เรียบร้อยทั้งหมด</p>}
           </div>
-          {count>0&&(
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs font-black px-2.5 py-1 rounded-full text-white" style={{background:color}}>{count}</span>
-              <span className="text-[#A1887F] text-xs">{isOpen?'▲':'▼'}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {count>0&&<span className="text-xs font-black px-2.5 py-1 rounded-full text-white" style={{background:color}}>{count}</span>}
+            <span className="text-[#A1887F] text-xs">{isOpen?'▲':'▼'}</span>
+          </div>
         </button>
         {isOpen&&(
           <div className="border-t px-4 py-3 space-y-2" style={{borderColor:count>0?border:'#efebe9'}}>
@@ -174,13 +187,13 @@ export default function DailyOps() {
                     <p className="text-[11px] text-[#A1887F] mt-0.5 truncate">🐱 {b.cat_names||'ไม่ระบุ'}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[10px] font-bold" style={{color}}>{fmtShortDate(b.start_date)}</p>
-                    <p className="text-[10px] text-[#C4A99A]">→ {fmtShortDate(b.end_date)}</p>
+                    <p className="text-[10px] font-bold" style={{color}}>{fmtShort(b.start_date)}</p>
+                    <p className="text-[10px] text-[#C4A99A]">→ {fmtShort(b.end_date)}</p>
                   </div>
                 </div>
               );
             }):(
-              <p className="text-center text-[11px] text-[#bbb] font-bold py-2">{emptyMsg}</p>
+              <p className="text-center text-[11px] text-green-600 font-bold py-2">{emptyMsg}</p>
             )}
           </div>
         )}
@@ -205,7 +218,7 @@ export default function DailyOps() {
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · Daily Operations</p>
               <h2 className="text-2xl font-black text-white tracking-tight">แจ้งเตือนเช็คอิน / เช็คเอ้าท์</h2>
-              <p className="text-white/40 text-xs mt-0.5">Notification บ้านที่ใกล้เข้า-ออก + สถานะการปล่อยเล่น</p>
+              <p className="text-white/40 text-xs mt-0.5">บ้านที่เช็คเอ้าท์แล้วจะถูกซ่อนออกโดยอัตโนมัติ</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-3">
@@ -228,12 +241,13 @@ export default function DailyOps() {
             <div className="flex items-center gap-2 mb-3 px-1">
               <BellRing size={15} className="text-[#DE9E48]"/>
               <p className="text-sm font-black text-[#372C2E] uppercase tracking-wider">การแจ้งเตือน</p>
+              <span className="text-[10px] text-[#A1887F] font-bold">(ซ่อนบ้านที่เช็คเอ้าท์แล้วอัตโนมัติ)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <NotifCard id="ci-today" icon={<LogIn size={16}/>} title="⚠️ เช็คอินวันนี้ — ยังไม่เช็คอิน"
+              <NotifCard id="ci-today" icon={<LogIn size={16}/>} title="⚠️ เช็คอินวันนี้ — รอเช็คอิน"
                 count={checkinToday.length} color="#d97706" bg="#fffbeb" border="#fde68a"
                 items={checkinToday} emptyMsg="ทุกบ้านเช็คอินครบแล้ว ✓" urgent={true}/>
-              <NotifCard id="co-today" icon={<LogOut size={16}/>} title="⚠️ เช็คเอ้าท์วันนี้ — ยังไม่เช็คเอ้าท์"
+              <NotifCard id="co-today" icon={<LogOut size={16}/>} title="⚠️ เช็คเอ้าท์วันนี้ — รอเช็คเอ้าท์"
                 count={checkoutToday.length} color="#dc2626" bg="#fef2f2" border="#fecaca"
                 items={checkoutToday} emptyMsg="ทุกบ้านเช็คเอ้าท์ครบแล้ว ✓" urgent={true}/>
               <NotifCard id="ci-tom" icon={<AlarmClock size={16}/>} title="📅 เช็คอินพรุ่งนี้"
@@ -250,7 +264,7 @@ export default function DailyOps() {
             <div className="flex items-center gap-2 mb-3 px-1">
               <PawPrint size={15} className="text-[#885E43]"/>
               <p className="text-sm font-black text-[#372C2E] uppercase tracking-wider">สถานะการปล่อยเล่น</p>
-              <span className="text-[10px] text-[#A1887F] font-bold">(บ้านที่เช็คอินแล้ว)</span>
+              <span className="text-[10px] text-[#A1887F] font-bold">(เฉพาะบ้านที่เช็คอินแล้ว ยังไม่เช็คเอ้าท์)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               <NotifCard id="play-m" icon={<Sun size={16}/>} title="🌅 ยังไม่ปล่อยเล่นรอบเช้า"
@@ -261,7 +275,7 @@ export default function DailyOps() {
                 items={notPlayedEvening} emptyMsg="ทุกบ้านปล่อยเล่นรอบเย็นแล้ว ✓" urgent={notPlayedEvening.length>0}/>
             </div>
 
-            {/* Currently staying summary table */}
+            {/* Summary table — เฉพาะบ้านที่กำลังพักอยู่ (ไม่เช็คเอ้าท์) */}
             {checkedInNow.length>0&&(
               <div className="bg-white rounded-2xl border border-[#efebe9] overflow-hidden shadow-sm">
                 <div className="px-4 py-2.5 bg-[#FDFBFA] border-b border-[#efebe9] flex items-center gap-2">
@@ -300,13 +314,20 @@ export default function DailyOps() {
                 </div>
               </div>
             )}
+
+            {checkedInNow.length===0&&(
+              <div className="text-center py-8 bg-white rounded-2xl border border-[#efebe9]">
+                <div className="text-3xl mb-2 opacity-30">🐾</div>
+                <p className="text-[#A1887F] font-bold text-sm">ไม่มีบ้านที่กำลังเข้าพักอยู่</p>
+              </div>
+            )}
           </div>
 
           {/* ===== DETAIL ACTION CARDS ===== */}
           {bookingsDetail.length>0&&(
             <div>
               <div className="flex items-center gap-2 mb-3 px-1">
-                <CalendarDays size={15} className="text-[#885E43]"/>
+                <LogIn size={15} className="text-[#885E43]"/>
                 <p className="text-sm font-black text-[#372C2E] uppercase tracking-wider">จัดการเช็คอิน / เช็คเอ้าท์ & ปล่อยเล่น</p>
               </div>
               <div className="space-y-4">
@@ -330,13 +351,12 @@ export default function DailyOps() {
                             <span className="w-1.5 h-1.5 rounded-full" style={{background:rc}}/>{ROOM_EMOJI[b.room_type]||'🏠'} {b.room_type}
                           </span>
                           {isCI&&<span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">● อยู่ระหว่างเข้าพัก</span>}
-                          {isCO&&<span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">✓ เช็คเอ้าท์แล้ว</span>}
                           {(ciToday||ciTom)&&!isCI&&(
                             <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
                               <AlarmClock size={10}/>{ciToday?'เช็คอินวันนี้':'เช็คอินพรุ่งนี้'}
                             </span>
                           )}
-                          {(coToday||coTom)&&!isCO&&(
+                          {(coToday||coTom)&&(
                             <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
                               <ArrowRightCircle size={10}/>{coToday?'เช็คเอ้าท์วันนี้':'เช็คเอ้าท์พรุ่งนี้'}
                             </span>
@@ -484,7 +504,7 @@ export default function DailyOps() {
           {bookingsDetail.length===0&&(
             <div className="text-center py-20 bg-white rounded-[2rem] border border-[#efebe9]">
               <div className="text-5xl mb-3 opacity-30">🐾</div>
-              <p className="text-[#A1887F] font-bold text-sm">ไม่มีรายการเช็คอิน/เช็คเอ้าท์ในช่วงนี้</p>
+              <p className="text-[#A1887F] font-bold text-sm">ไม่มีรายการในช่วงนี้ที่ต้องดำเนินการ</p>
               <p className="text-[#C4A99A] text-xs mt-1">เปลี่ยนวันที่เพื่อดูวันอื่น</p>
             </div>
           )}
