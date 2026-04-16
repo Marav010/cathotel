@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
 
 const OPENROUTER_FREE_MODELS = [
-  { id: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 (Free Tier)' },
-  { id: 'meta-llama/llama-3-8b-instruct', label: 'Llama 3 8B (Free)' },
-  { id: 'mistralai/mistral-7b-instruct', label: 'Mistral 7B (Free)' },
-  { id: 'google/gemma-7b-it', label: 'Gemma 7B (Free)' },
-  { id: 'nousresearch/nous-hermes-2-mixtral-8x7b-dpo', label: 'Mixtral Hermes (Free)' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
+  { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
+  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
+  { id: 'qwen/qwen3-coder:free', label: 'Qwen Coder' },
+  { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
 ];
-
 const QUICK_QUESTIONS = [
   'มีบ้านไหนพักอยู่ตอนนี้บ้าง?',
   'สัปดาห์นี้มีเข้าพักกี่บ้าน?',
@@ -75,6 +75,57 @@ export default function AIAssistant() {
       customers: (customers||[]).length > 0 ? customers : [],
     };
   };
+  const callAI = async ({ systemPrompt, msg }) => {
+  // 1. ลอง OpenRouter ก่อน
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: msg },
+        ],
+      }),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      return json.choices?.[0]?.message?.content;
+    }
+  } catch (e) {}
+
+  // 2. fallback → Gemini (ใช้ฟรี)
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    );
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: systemPrompt + '\n\nUser: ' + msg }],
+            },
+          ],
+        }),
+      }
+    );
+
+    const json = await geminiRes.json();
+    return json.candidates?.[0]?.content?.parts?.[0]?.text;
+  } catch (e) {}
+
+  throw new Error('AI ทุกตัวใช้งานไม่ได้');
+};
 
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
