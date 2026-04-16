@@ -20,13 +20,13 @@ const QUICK_QUESTIONS = [
   'วันนี้มีเช็คอิน/เช็คเอ้าท์กี่บ้าน?',
 ];
 
-const todayStr = () => {
-  const d = new Date();
+const getTodayISO = () => new Date().toISOString().split('T')[0];
 
+const getTodayTH = () => {
+  const d = new Date();
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear() + 543; // แปลงเป็น พ.ศ.
-
+  const year = d.getFullYear() + 543;
   return `${day}-${month}-${year}`;
 };
 
@@ -49,7 +49,8 @@ export default function AIAssistant() {
   }, [messages, loading]);
 
   const fetchAllData = async () => {
-    const today = todayStr();
+  const todayISO = getTodayISO();
+  const todayTH = getTodayTH();
     const [
       { data: bookings },
       { data: customers },
@@ -64,7 +65,8 @@ export default function AIAssistant() {
     (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
 
     return {
-      today,
+       todayISO,
+       todayTH,
       totalBookings: (bookings||[]).length,
       bookings: (bookings||[]).map(b => ({
         id: b.id,
@@ -87,12 +89,12 @@ export default function AIAssistant() {
 
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
-    const todayCI = data.bookings.filter(b => b.startDate === data.today);
-    const todayCO = data.bookings.filter(b => b.endDate === data.today);
+    const todayCI = data.bookings.filter(b => b.startDate === data.todayISO);
+    const todayCO = data.bookings.filter(b => b.endDate === data.todayISO);
 
     return `คุณเป็น AI ผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel) โรงแรมสำหรับแมว
 
-วันนี้คือ: ${data.today}
+วันนี้คือ: ${data.todayTH}
 จำนวนการจองทั้งหมด: ${data.totalBookings} รายการ
 บ้านที่กำลังเข้าพักอยู่ตอนนี้: ${activeNow.length} บ้าน
 เช็คอินวันนี้: ${todayCI.length} บ้าน
