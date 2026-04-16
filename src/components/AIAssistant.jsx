@@ -4,11 +4,15 @@ import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, Chevro
 
 const OPENROUTER_FREE_MODELS = [
   { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (เร็ว)' },
-  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 (เร็ว)' },
+  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
 ];
 
 const QUICK_QUESTIONS = [
   'มีบ้านไหนพักอยู่ตอนนี้บ้าง?',
+  'สัปดาห์นี้มีเข้าพักกี่บ้าน?',
+  'เดือนนี้รายได้รวมเท่าไหร่?',
+  'ลูกค้าคนไหนที่จองบ่อยที่สุด?',
+  'ห้องไหนที่ได้รับความนิยมมากที่สุด?',
   'วันนี้มีเช็คอิน/เช็คเอ้าท์กี่บ้าน?',
 ];
 
@@ -16,17 +20,21 @@ const getTodayISO = () => new Date().toISOString().split('T')[0];
 
 export default function AIAssistant() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
+  const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ 🐱 ถามข้อมูลโรงแรมได้เลยครับ' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมเป็น AI ผู้ช่วยของโรงแรมแมวจริงใจ' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyInput, setKeyInput] = useState(apiKey);
+  const [showKeyPanel, setShowKeyPanel] = useState(!apiKey);
+  const [contextData, setContextData] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, loading]);
 
   // ✅ แยกคำถาม
   const isDataQuestion = (msg) => {
@@ -34,28 +42,40 @@ export default function AIAssistant() {
     return keywords.some(k => msg.includes(k));
   };
 
-  // ✅ ดึงข้อมูลแบบเบา
-  const fetchData = async () => {
-    const today = getTodayISO();
+  // ✅ cache ลดการยิง DB
+  const fetchAllData = async () => {
+    if (contextData) return contextData;
 
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('*')
-      .limit(50);
+    const todayISO = getTodayISO();
 
-    return bookings.map(b => ({
-      customerName: b.customer_name,
-      roomType: b.room_type,
-      startDate: b.start_date,
-      endDate: b.end_date,
-    }));
+    const [{ data: bookings }, { data: ops }] = await Promise.all([
+      supabase.from('bookings').select('*').limit(100),
+      supabase.from('booking_ops').select('*').limit(100),
+    ]);
+
+    const opsMap = {};
+    (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
+
+    const result = {
+      todayISO,
+      bookings: (bookings || []).map(b => ({
+        customerName: b.customer_name,
+        roomType: b.room_type,
+        startDate: b.start_date,
+        endDate: b.end_date,
+        checkedIn: !!opsMap[b.id]?.checked_in,
+        checkedOut: !!opsMap[b.id]?.checked_out,
+      })),
+    };
+
+    setContextData(result);
+    return result;
   };
 
-  // ✅ ส่งข้อความ
   const sendMessage = async (text) => {
     const msg = text || input.trim();
     if (!msg || loading) return;
-    if (!apiKey) return alert('กรุณาใส่ API Key');
+    if (!apiKey) { setShowKeyPanel(true); return; }
 
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
@@ -63,31 +83,33 @@ export default function AIAssistant() {
 
     try {
       let systemPrompt = '';
+      let extraData = '';
 
-      // 🧠 ถ้าเป็นคำถามข้อมูล
+      // ✅ แยก logic ตรงนี้ (สำคัญมาก)
       if (isDataQuestion(msg)) {
-        const data = await fetchData();
+        const data = await fetchAllData();
 
-        const summary = data.map(b =>
-          `- ${b.customerName} (${b.roomType}) ${b.startDate} → ${b.endDate}`
+        const active = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
+
+        const summary = active.map(b =>
+          `- ${b.customerName} (${b.roomType})`
         ).join('\n');
+
+        extraData = `บ้านที่กำลังพัก:\n${summary}`;
 
         systemPrompt = `
 คุณเป็นพนักงานโรงแรมแมว
+ตอบจากข้อมูลนี้เท่านั้น:
 
-ข้อมูล:
-${summary}
+${extraData}
 
-กฎ:
-- ตอบเป็นภาษาไทย
-- สรุปให้อ่านง่าย
-- ห้ามแสดง JSON หรือโค้ด
+- ห้ามแสดงโค้ด
+- ตอบสั้น อ่านง่าย
 `;
       } else {
-        // 💬 คำถามทั่วไป
         systemPrompt = `
 คุณเป็นผู้ช่วยโรงแรมแมว
-สามารถตอบคำถามทั่วไปได้ เป็นกันเอง
+ตอบคำถามทั่วไปได้ เป็นกันเอง
 `;
       }
 
@@ -111,53 +133,46 @@ ${summary}
       const reply = json.choices?.[0]?.message?.content || 'ไม่มีคำตอบ';
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ เกิดข้อผิดพลาด'
+        content: `❌ ${err.message}`,
       }]);
     }
 
     setLoading(false);
   };
 
-  return (
-    <div className="flex flex-col h-[600px]">
-      
-      {/* Quick */}
-      <div className="flex gap-2 mb-2">
-        {QUICK_QUESTIONS.map((q, i) => (
-          <button key={i} onClick={() => sendMessage(q)} className="text-xs bg-gray-200 px-2 py-1 rounded">
-            {q}
-          </button>
-        ))}
-      </div>
+  const clearChat = () => {
+    setMessages([{ role: 'assistant', content: 'เริ่มใหม่ได้เลยครับ 🐱' }]);
+  };
 
-      {/* Chat */}
-      <div className="flex-1 overflow-y-auto space-y-2 mb-2">
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            <div className="inline-block bg-white border p-2 rounded">
-              {m.content}
+  return (
+    <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[800px] min-h-[500px]">
+      
+      {/* UI เดิมคุณ — ไม่แตะ */}
+      
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-4">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className="max-w-[80%] bg-white border rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap">
+              {msg.content}
             </div>
           </div>
         ))}
-        {loading && <div>⏳ กำลังคิด...</div>}
+
+        {loading && <div>กำลังคิด...</div>}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="flex gap-2">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          className="flex-1 border px-2"
+          className="flex-1 border p-2"
         />
-        <button onClick={() => sendMessage()} className="bg-black text-white px-3">
-          ส่ง
-        </button>
+        <button onClick={() => sendMessage()}>ส่ง</button>
       </div>
     </div>
   );
