@@ -136,7 +136,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 - ใช้ภาษาไทย
 - ตอบสั้น กระชับ
 - ถ้ามีหลายรายการ ให้เรียงเป็นข้อ
-
+  };
 
   const saveApiKey = () => {
     localStorage.setItem('openrouter_api_key', keyInput);
