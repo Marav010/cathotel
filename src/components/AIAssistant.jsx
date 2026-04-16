@@ -3,31 +3,26 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
 
 const OPENROUTER_FREE_MODELS = [
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
-  { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
-  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (แนะนำ)' },
+  { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash' },
   { id: 'qwen/qwen3-coder:free', label: 'Qwen Coder' },
-  { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
 ];
 
 const QUICK_QUESTIONS = [
-  'มีบ้านไหนพักอยู่ตอนนี้บ้าง?',
-  'สัปดาห์นี้มีเข้าพักกี่บ้าน?',
-  'เดือนนี้รายได้รวมเท่าไหร่?',
-  'ลูกค้าคนไหนที่จองบ่อยที่สุด?',
-  'ห้องไหนที่ได้รับความนิยมมากที่สุด?',
-  'วันนี้มีเช็คอิน/เช็คเอ้าท์กี่บ้าน?',
+  'ตอนนี้มีแมวบ้านไหนพักอยู่บ้าง?',
+  'วันนี้มีเช็คอินกี่บ้าน?',
+  'สรุปรายได้ของเดือนนี้ให้หน่อย',
+  'ใครคือลูกค้าประจำของเรา?',
+  'ห้องประเภทไหนขายดีที่สุด?',
 ];
 
 const getTodayISO = () => new Date().toISOString().split('T')[0];
-
 const getTodayTH = () => {
   const d = new Date();
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear() + 543;
-  return `${day}/${month}/${year}`;
+  return d.toLocaleDateString('th-TH', { 
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' 
+  });
 };
 
 export default function AIAssistant() {
@@ -35,107 +30,88 @@ export default function AIAssistant() {
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมเป็น AI ผู้ช่วยของโรงแรมแมวจริงใจ ถามผมได้เลยเกี่ยวกับข้อมูลการจอง ลูกค้า รายได้ หรืออะไรก็ตามที่เกี่ยวกับโรงแรม!' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมคือ "จอมทัพ" ผู้ช่วย AI ของโรงแรมแมวจริงใจ วันนี้มีอะไรให้ผมช่วยตรวจสอบข้อมูลไหมครับ?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [keyInput, setKeyInput] = useState(apiKey);
   const [showKeyPanel, setShowKeyPanel] = useState(!apiKey);
-  const [contextData, setContextData] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  const fetchAllData = async () => {
-  const todayISO = getTodayISO();
-  const todayTH = getTodayTH();
-    const [
-      { data: bookings },
-      { data: customers },
-      { data: ops },
-    ] = await Promise.all([
-      supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(200),
-      supabase.from('customers').select('*').limit(200),
-      supabase.from('booking_ops').select('*').limit(200),
+  const fetchAndProcessData = async () => {
+    const todayISO = getTodayISO();
+    
+    const [ { data: bookings }, { data: customers }, { data: ops } ] = await Promise.all([
+      supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(100),
+      supabase.from('customers').select('*'),
+      supabase.from('booking_ops').select('*'),
     ]);
 
     const opsMap = {};
-    (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
+    (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
+
+    // --- ส่วนการประมวลผลข้อมูลเพื่อให้ AI ไม่ต้องคำนวณเอง (Precision) ---
+    const allBookings = (bookings || []).map(b => ({
+      id: b.id,
+      customer: b.customer_name,
+      cats: b.cat_names,
+      room: b.room_type,
+      start: b.start_date,
+      end: b.end_date,
+      price: b.total_price,
+      status: opsMap[b.id]?.checked_out ? 'เช็คเอ้าท์แล้ว' : (opsMap[b.id]?.checked_in ? 'กำลังพักอยู่' : 'รอดำเนินการ')
+    }));
+
+    const activeNow = allBookings.filter(b => b.status === 'กำลังพักอยู่');
+    const todayCheckIn = allBookings.filter(b => b.start === todayISO);
+    
+    // คำนวณรายได้เดือนปัจจุบัน
+    const currentMonth = todayISO.substring(0, 7); // YYYY-MM
+    const monthlyRevenue = allBookings
+      .filter(b => b.start.startsWith(currentMonth))
+      .reduce((sum, b) => sum + (b.price || 0), 0);
+
+    // สถิติห้องพัก
+    const roomStats = allBookings.reduce((acc, b) => {
+      acc[b.room] = (acc[b.room] || 0) + 1;
+      return acc;
+    }, {});
 
     return {
-       todayISO,
-       todayTH,
-      totalBookings: (bookings||[]).length,
-      bookings: (bookings||[]).map(b => ({
-        id: b.id,
-        customerName: b.customer_name,
-        catNames: b.cat_names,
-        roomType: b.room_type,
-        startDate: b.start_date,
-        endDate: b.end_date,
-        phone: b.phone,
-        totalPrice: b.total_price,
-        notes: b.notes,
-        checkedIn: !!opsMap[b.id]?.checked_in,
-        checkedOut: !!opsMap[b.id]?.checked_out,
-        checkinTime: opsMap[b.id]?.checkin_time,
-        checkoutTime: opsMap[b.id]?.checkout_time,
-      })),
-      customers: (customers||[]).length > 0 ? customers : [],
+      todayTH: getTodayTH(),
+      activeNow,
+      todayCheckIn,
+      monthlyRevenue,
+      roomStats,
+      allBookings: allBookings.slice(0, 50), // ส่งประวัติล่าสุด 50 รายการพอป้องกัน Token เต็ม
+      customerCount: (customers || []).length
     };
   };
 
   const buildSystemPrompt = (data) => {
-    const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
-    const todayCI = data.bookings.filter(b => b.startDate === data.todayISO);
-    const todayCO = data.bookings.filter(b => b.endDate === data.todayISO);
+    return `คุณคือ "จอมทัพ" ผู้จัดการโรงแรมแมวอัจฉริยะ (Jingjai Cat Hotel)
+    
+วันที่ปัจจุบัน: ${data.todayTH}
 
-    return `คุณเป็น AI ผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel) โรงแรมสำหรับแมว
+ข้อมูลสรุปเรียลไทม์:
+- แมวที่กำลังพักอยู่ตอนนี้: ${data.activeNow.length} บ้าน (${data.activeNow.map(b => b.cats).join(', ')})
+- ลูกค้าทั้งหมดในระบบ: ${data.customerCount} รายการ
+- รายได้รวมเฉพาะเดือนนี้: ${data.monthlyRevenue.toLocaleString()} บาท
+- ความนิยมห้องพัก: ${JSON.stringify(data.roomStats)}
 
-วันนี้คือ: ${data.todayTH}
-จำนวนการจองทั้งหมด: ${data.totalBookings} รายการ
-บ้านที่กำลังเข้าพักอยู่ตอนนี้: ${activeNow.length} บ้าน
-เช็คอินวันนี้: ${todayCI.length} บ้าน
-เช็คเอ้าท์วันนี้: ${todayCO.length} บ้าน
+รายการจองล่าสุด (Data):
+${JSON.stringify(data.allBookings)}
 
-ประเภทบ้านพัก: สแตนดาร์ด, ดีลักซ์, ซูพีเรีย, พรีเมี่ยม, วีไอพี, วีวีไอพี
-
-ข้อมูลการจอง (${data.bookings.length} รายการล่าสุด):
-const summary = {
-  activeNow,
-  todayCheckin: todayCI,
-  todayCheckout: todayCO,
-  revenueThisMonth: ...,
-};
-
-${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stringify(data.customers, null, 0)}` : ''}
-
-คุณคือพนักงานโรงแรมแมว "จริงใจ"
-
-หน้าที่:
-- ตอบคำถามจากข้อมูลที่ให้เท่านั้น
-- สรุปให้เข้าใจง่าย เหมือนคุยกับลูกค้า
-- ถ้าไม่มีข้อมูล ให้บอกว่า "ไม่มีข้อมูล"
-
-กฎ:
-- ห้ามแสดง JSON หรือโค้ด
-- ใช้ภาษาไทย
-- ตอบสั้น กระชับ
-- ถ้ามีหลายรายการ ให้เรียงเป็นข้อ
-คุณคือพนักงานโรงแรมแมว "จริงใจ"
-
-หน้าที่:
-- ตอบคำถามจากข้อมูลที่ให้เท่านั้น
-- สรุปให้เข้าใจง่าย เหมือนคุยกับลูกค้า
-- ถ้าไม่มีข้อมูล ให้บอกว่า "ไม่มีข้อมูล"
-
-กฎ:
-- ห้ามแสดง JSON หรือโค้ด
-- ใช้ภาษาไทย
-- ตอบสั้น กระชับ
-- ถ้ามีหลายรายการ ให้เรียงเป็นข้อ
+กฎเหล็กในการตอบ:
+1. ตอบเป็นภาษาไทยที่สุภาพ มีบุคลิกคนรักแมว (ใช้ emoji 🐾, 🐱 ได้)
+2. **ห้ามมโน** ถ้าไม่มีข้อมูลในลิสต์ที่ส่งให้ ให้ตอบว่า "ขออภัยครับ ผมไม่พบข้อมูลส่วนนี้ในระบบ"
+3. เมื่อถูกถามเรื่องรายได้ หรือจำนวน ให้ใช้ข้อมูลสรุปจาก "ข้อมูลสรุปเรียลไทม์" เป็นหลัก
+4. หากมีรายการเยอะ ให้สรุปเป็นข้อๆ ให้สวยงามและอ่านง่าย
+5. ห้ามแสดง JSON หรือโครงสร้างโค้ดเด็ดขาด`;
   };
 
   const saveApiKey = () => {
@@ -154,184 +130,138 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
     setLoading(true);
 
     try {
-      // Fetch fresh data every time
-      const data = await fetchAllData();
-      setContextData(data);
+      const data = await fetchAndProcessData();
       const systemPrompt = buildSystemPrompt(data);
-
-      const historyForAPI = messages.slice(-8).map(m => ({ role: m.role, content: m.content }));
 
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Jingjai Cat Hotel',
         },
         body: JSON.stringify({
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            ...historyForAPI,
+            ...messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: msg },
           ],
-          max_tokens: 2000,
-          temperature: 0.1,
+          temperature: 0.3, // ต่ำเพื่อให้ตอบความจริง ไม่เน้นจินตนาการ
         }),
       });
 
       const json = await res.json();
-      if (json.error) throw new Error(json.error.message || 'API Error');
-      const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
+      if (json.error) throw new Error(json.error.message);
+      
+      const reply = json.choices?.[0]?.message?.content || 'ขออภัยครับ ผมสับสนนิดหน่อย ลองถามใหม่อีกครั้งนะครับ';
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ เกิดข้อผิดพลาด: ${err.message}\n\nกรุณาตรวจสอบ API Key และลองใหม่อีกครั้ง`,
-      }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `❌ เกิดข้อผิดพลาด: ${err.message}` }]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const clearChat = () => {
-    setMessages([{ role: 'assistant', content: 'สวัสดีครับ! 🐱 ถามได้เลยครับ เกี่ยวกับข้อมูลในโรงแรมแมวจริงใจ' }]);
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[800px] min-h-[500px]">
+    <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[800px] min-h-[600px] bg-[#FDFCFB] rounded-[2.5rem] overflow-hidden border border-[#DBD0C5] shadow-xl">
       {/* Header */}
-      <div className="relative overflow-hidden bg-[#372C2E] rounded-[2rem] px-6 py-5 shadow-2xl shadow-[#372C2E]/20 mb-4 shrink-0">
-        <div className="absolute -top-4 -right-4 text-8xl opacity-[0.05] rotate-12 select-none">✨</div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-4">
+      <div className="bg-[#372C2E] p-6 shrink-0">
+        <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="bg-[#DE9E48] p-3.5 rounded-2xl shadow-lg shrink-0">
-              <Sparkles size={22} className="text-[#372C2E]" />
+            <div className="bg-[#DE9E48] p-3 rounded-2xl">
+              <Bot size={24} className="text-[#372C2E]" />
             </div>
             <div>
-              <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
-              <h2 className="text-xl font-black text-white tracking-tight">ผู้ช่วย AI โรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">ถามข้อมูลการจอง ลูกค้า รายรับ และอื่นๆ ได้เลย</p>
+              <h2 className="text-white font-bold text-lg">จอมทัพ AI Assistant</h2>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <p className="text-white/50 text-xs">พร้อมดูแลข้อมูลโรงแรมแมว</p>
+              </div>
             </div>
           </div>
-          <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
-            {/* Model selector */}
-            <div className="relative">
-              <select value={model} onChange={e => setModel(e.target.value)}
-                className="bg-white/10 border border-white/20 text-white font-bold text-[11px] rounded-xl px-3 py-2 outline-none focus:border-[#DE9E48] appearance-none cursor-pointer pr-7">
-                {OPENROUTER_FREE_MODELS.map(m => (
-                  <option key={m.id} value={m.id} className="bg-[#372C2E] text-white">{m.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
-            </div>
-            <button onClick={() => setShowKeyPanel(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white/70 hover:text-white text-[11px] font-bold transition-all">
-              <Key size={13} /> API Key
-            </button>
-            <button onClick={clearChat}
-              className="p-2 bg-white/10 border border-white/20 rounded-xl text-white/70 hover:text-white transition-all">
-              <RefreshCw size={14} />
+          <div className="flex gap-2">
+            <select value={model} onChange={e => setModel(e.target.value)}
+              className="bg-white/10 border border-white/20 text-white text-[11px] rounded-lg px-2 py-1 outline-none">
+              {OPENROUTER_FREE_MODELS.map(m => <option key={m.id} value={m.id} className="bg-[#372C2E]">{m.label}</option>)}
+            </select>
+            <button onClick={() => setShowKeyPanel(!showKeyPanel)} className="p-2 bg-white/10 rounded-lg text-white/70 hover:text-white">
+              <Key size={16} />
             </button>
           </div>
         </div>
 
-        {/* API Key panel */}
         {showKeyPanel && (
-          <div className="relative z-10 mt-4 bg-white/10 border border-white/20 rounded-2xl p-4">
-            <p className="text-white/80 text-xs font-bold mb-2">🔑 OpenRouter API Key (ฟรี 100% — สมัครได้ที่ openrouter.ai)</p>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={keyInput}
-                  onChange={e => setKeyInput(e.target.value)}
-                  placeholder="sk-or-v1-..."
-                  className="w-full bg-white/10 border border-white/20 text-white text-xs font-mono rounded-xl px-3 py-2 outline-none focus:border-[#DE9E48] pr-8"
-                />
-                <button onClick={() => setShowKey(v => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 hover:text-white">
-                  {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                </button>
-              </div>
-              <button onClick={saveApiKey}
-                className="px-4 py-2 bg-[#DE9E48] text-[#372C2E] font-black text-xs rounded-xl hover:bg-[#f0b55e] transition-all">
-                บันทึก
-              </button>
-            </div>
-            <p className="text-white/40 text-[10px] mt-2">Key ถูกเก็บใน localStorage ของเบราว์เซอร์เท่านั้น ไม่ถูกส่งไปที่อื่น</p>
+          <div className="mt-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              placeholder="ใส่ OpenRouter API Key ตรงนี้"
+              className="w-full bg-black/20 border border-white/20 rounded-lg px-3 py-2 text-white text-xs mb-2 outline-none focus:border-[#DE9E48]"
+            />
+            <button onClick={saveApiKey} className="w-full bg-[#DE9E48] text-[#372C2E] font-bold py-2 rounded-lg text-xs">บันทึก Key</button>
           </div>
         )}
       </div>
 
-      {/* Quick questions */}
-      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 shrink-0 scrollbar-hide">
+      {/* Quick Questions */}
+      <div className="flex gap-2 p-4 overflow-x-auto scrollbar-hide border-b border-[#F0EAE5]">
         {QUICK_QUESTIONS.map((q, i) => (
-          <button key={i} onClick={() => sendMessage(q)}
-            className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full bg-white border border-[#DBD0C5] text-[#885E43] hover:bg-[#F5EEE8] hover:border-[#885E43] transition-all">
+          <button key={i} onClick={() => sendMessage(q)} className="shrink-0 px-4 py-2 bg-white border border-[#DBD0C5] rounded-full text-xs font-semibold text-[#885E43] hover:bg-[#DE9E48] hover:text-white transition-all shadow-sm">
             {q}
           </button>
         ))}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-4">
+      {/* Message Area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-xl bg-[#372C2E] flex items-center justify-center shrink-0 mt-1">
-                <Bot size={14} className="text-[#DE9E48]" />
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${msg.role === 'user' ? 'bg-[#DE9E48]' : 'bg-[#372C2E]'}`}>
+                {msg.role === 'user' ? <User size={18} className="text-[#372C2E]" /> : <Bot size={18} className="text-[#DE9E48]" />}
               </div>
-            )}
-            <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-              msg.role === 'user'
-                ? 'bg-[#885E43] text-white rounded-tr-sm font-medium'
-                : 'bg-white border border-[#efebe9] text-[#372C2E] rounded-tl-sm shadow-sm'
-            }`}>
-              {msg.content}
+              <div className={`p-4 rounded-3xl shadow-sm text-sm leading-relaxed ${
+                msg.role === 'user' ? 'bg-[#885E43] text-white rounded-tr-none' : 'bg-white text-[#372C2E] border border-[#F0EAE5] rounded-tl-none'
+              }`}>
+                {msg.content}
+              </div>
             </div>
-            {msg.role === 'user' && (
-              <div className="w-8 h-8 rounded-xl bg-[#DE9E48] flex items-center justify-center shrink-0 mt-1">
-                <User size={14} className="text-[#372C2E]" />
-              </div>
-            )}
           </div>
         ))}
         {loading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-[#372C2E] flex items-center justify-center shrink-0 mt-1">
-              <Bot size={14} className="text-[#DE9E48]" />
+          <div className="flex gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-[#372C2E] flex items-center justify-center animate-pulse">
+              <Bot size={18} className="text-[#DE9E48]" />
             </div>
-            <div className="bg-white border border-[#efebe9] rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2 text-[#A1887F]">
-                <Loader2 size={14} className="animate-spin" />
-                <span className="text-xs font-bold">กำลังดึงข้อมูลและวิเคราะห์...</span>
-              </div>
+            <div className="bg-white border border-[#F0EAE5] p-4 rounded-3xl rounded-tl-none flex items-center gap-3">
+              <Loader2 size={16} className="animate-spin text-[#DE9E48]" />
+              <span className="text-xs font-bold text-[#A1887F]">จอมทัพกำลังเปิดสมุดบัญชี...</span>
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="shrink-0">
-        <div className="flex gap-3 bg-white border border-[#DBD0C5] rounded-2xl p-2 shadow-sm focus-within:border-[#885E43] transition-all">
+      {/* Input Area */}
+      <div className="p-6 bg-white border-t border-[#F0EAE5]">
+        <div className="flex gap-3 p-2 bg-[#F8F5F2] border-2 border-[#F0EAE5] rounded-2xl focus-within:border-[#DE9E48] transition-all">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="ถามเกี่ยวกับข้อมูลโรงแรม เช่น บ้านไหนจะเช็คออกวันนี้? เบอร์นี้คือบ้านไหน?"
-            className="flex-1 text-sm text-[#372C2E] placeholder:text-[#C4A99A] outline-none px-2 font-medium bg-transparent"
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            placeholder="พิมพ์คำถามของคุณที่นี่..."
+            className="flex-1 bg-transparent px-3 outline-none text-sm font-medium text-[#372C2E]"
           />
-          <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
-            className="p-2.5 rounded-xl bg-[#885E43] text-white hover:bg-[#6e4a34] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          <button 
+            onClick={() => sendMessage()}
+            disabled={loading || !input.trim()}
+            className="bg-[#372C2E] text-[#DE9E48] p-3 rounded-xl hover:bg-[#4a3b3e] disabled:opacity-30 transition-all shadow-lg"
+          >
+            <Send size={18} />
           </button>
         </div>
-        <p className="text-center text-[10px] text-[#C4A99A] mt-2 font-bold">
-          ใช้ OpenRouter Free Models • ข้อมูลดึงจาก Supabase โดยตรง
-        </p>
       </div>
     </div>
   );
