@@ -84,25 +84,22 @@ const tryFetchAI = async (payload) => {
 
   for (const m of modelsToTry) {
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ ...payload, model: m }),
-      });
+   const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    contents: [
+      {
+        parts: [{ text: systemPrompt + "\n\nUser: " + msg }]
+      }
+    ]
+  })
+});
 
-      if (!res.ok) continue;
-
-      const json = await res.json();
-      if (!json.error) return json;
-
-    } catch (e) {}
-  }
-
-  throw new Error('ทุกโมเดลใช้งานไม่ได้');
-};
+const json = await res.json();
+const reply = json.candidates?.[0]?.content?.parts?.[0]?.text || 'ไม่ได้รับคำตอบ';
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
     const todayCI = data.bookings.filter(b => b.startDate === data.today);
