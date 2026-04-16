@@ -115,6 +115,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 - ตอบเหมือนพนักงานโรงแรม
 - ใช้ emoji เล็กน้อย
 `;
+  };
 
   const saveApiKey = () => {
     localStorage.setItem('openrouter_api_key', keyInput);
