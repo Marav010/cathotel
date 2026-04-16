@@ -132,6 +132,7 @@ function App() {
           {activeTab === 'history'     && <HistoryTable />}
           {activeTab === 'customers'   && <CustomerDatabase />}
           {activeTab === 'report'      && <ReportSummary />}
+          {activeTab === 'ai'          && <AIAssistant />}
         </div>
       </main>
     </div>
