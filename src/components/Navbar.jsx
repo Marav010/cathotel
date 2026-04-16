@@ -1,4 +1,4 @@
-import { Calendar, PlusCircle, History, BarChart3, LogOut, Users, ClipboardCheck, PawPrint } from 'lucide-react';
+import { Calendar, PlusCircle, History, BarChart3, LogOut, Users, ClipboardCheck, PawPrint, Sparkles } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab, onLogout }) {
   const menus = [
@@ -9,6 +9,7 @@ export default function Navbar({ activeTab, setActiveTab, onLogout }) {
     { id: 'history',     label: 'ประวัติการจอง',          icon: <History size={18} /> },
     { id: 'customers',   label: 'ข้อมูลลูกค้า',           icon: <Users size={18} /> },
     { id: 'report',      label: 'รายงานสรุป',             icon: <BarChart3 size={18} /> },
+    { id: 'ai',          label: 'AI ผู้ช่วย',             icon: <Sparkles size={18} />, special: true },
   ];
 
   return (
@@ -27,11 +28,15 @@ export default function Navbar({ activeTab, setActiveTab, onLogout }) {
             {menus.map((m) => (
               <button key={m.id} onClick={() => setActiveTab(m.id)}
                 className={`flex items-center gap-1.5 px-2.5 md:px-3 py-2 rounded-full text-xs font-bold transition-all duration-200 whitespace-nowrap shrink-0 ${
-                  activeTab === m.id
+                  m.special
+                    ? activeTab === m.id
+                      ? 'bg-gradient-to-r from-[#7c3aed] to-[#a855f7] text-white shadow-md'
+                      : 'text-[#7c3aed] hover:bg-purple-50 border border-purple-200'
+                    : activeTab === m.id
                     ? 'bg-[#885E43] text-white shadow-md shadow-[#885E43]/20'
                     : 'text-[#A1887F] hover:bg-[#F5F2F0] hover:text-[#372C2E]'
                 }`}>
-                <span className={activeTab === m.id ? 'text-[#DE9E48]' : ''}>{m.icon}</span>
+                <span className={activeTab === m.id ? (m.special ? 'text-white' : 'text-[#DE9E48]') : m.special ? 'text-[#7c3aed]' : ''}>{m.icon}</span>
                 <span className="hidden lg:inline">{m.label}</span>
               </button>
             ))}
