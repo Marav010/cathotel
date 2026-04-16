@@ -213,7 +213,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
                   type={showKey ? 'text' : 'password'}
                   value={keyInput}
                   onChange={e => setKeyInput(e.target.value)}
-                  placeholder="sk-or-v1-..."
+                  placeholder="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"
                   className="w-full bg-white/10 border border-white/20 text-white text-xs font-mono rounded-xl px-3 py-2 outline-none focus:border-[#DE9E48] pr-8"
                 />
                 <button onClick={() => setShowKey(v => !v)}
