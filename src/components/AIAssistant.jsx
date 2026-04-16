@@ -145,55 +145,80 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
     setShowKeyPanel(false);
   };
 
-  const sendMessage = async (text) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
-    if (!apiKey) { setShowKeyPanel(true); return; }
+const sendMessage = async (text) => {
+  const msg = text || input.trim();
+  if (!msg || loading) return;
+  if (!apiKey) { setShowKeyPanel(true); return; }
 
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg }]);
-    setLoading(true);
+  setInput('');
+  setMessages(prev => [...prev, { role: 'user', content: msg }]);
+  setLoading(true);
 
-    try {
-      // Fetch fresh data every time
-      const data = await fetchAllData();
-      setContextData(data);
-      const systemPrompt = buildSystemPrompt(data);
+  try {
 
-      const historyForAPI = messages.slice(-8).map(m => ({ role: m.role, content: m.content }));
-
+    // ✅ 1. ถ้าเป็นคำถามทั่วไป (ไม่ใช้ DB)
+    if (!isDataQuestion(msg)) {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Jingjai Cat Hotel',
         },
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: systemPrompt },
-            ...historyForAPI,
-            { role: 'user', content: msg },
+            {
+              role: 'system',
+              content: 'คุณเป็นผู้ช่วยโรงแรมแมว ตอบคำถามทั่วไปได้ เป็นกันเอง'
+            },
+            { role: 'user', content: msg }
           ],
-          max_tokens: 2500,
-          temperature: 0.3,
+          max_tokens: 300,
         }),
       });
 
       const json = await res.json();
-      if (json.error) throw new Error(json.error.message || 'API Error');
       const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
+
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ เกิดข้อผิดพลาด: ${err.message}\n\nกรุณาตรวจสอบ API Key และลองใหม่อีกครั้ง`,
-      }]);
+      setLoading(false);
+      return; // ✅ สำคัญมาก
     }
-    setLoading(false);
-  };
+
+    // ✅ 2. ถ้าเป็นคำถามข้อมูล → ค่อยโหลด DB
+    const data = await fetchAllData();
+    const systemPrompt = buildSystemPrompt(data);
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: msg },
+        ],
+        max_tokens: 500,
+      }),
+    });
+
+    const json = await res.json();
+    const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
+
+    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+
+  } catch (err) {
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `❌ ${err.message}`,
+    }]);
+  }
+
+  setLoading(false);
+};
 
   const clearChat = () => {
     setMessages([{ role: 'assistant', content: 'สวัสดีครับ! 🐱 ถามได้เลยครับ เกี่ยวกับข้อมูลในโรงแรมแมวจริงใจ' }]);
