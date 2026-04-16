@@ -5,7 +5,7 @@ import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, Chevro
 // ========== CONFIG ==========
 const HARDCODED_API_KEY = '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';
 
-const OPENROUTER_FREE_MODELS = [
+const OPENROUTER_MODELS = [
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
   { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
   { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
