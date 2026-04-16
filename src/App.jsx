@@ -11,6 +11,7 @@ import PlayTracker from './components/PlayTracker';
 import UserHome from './components/UserHome';
 import UserCalendar from './components/UserCalendar';
 import UserNavbar from './components/UserNavbar';
+import UserNavbar from './components/AIAssistant';
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const IS_ADMIN_DOMAIN = window.location.hostname.includes('admin');
