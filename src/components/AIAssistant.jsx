@@ -20,7 +20,15 @@ const QUICK_QUESTIONS = [
   'วันนี้มีเช็คอิน/เช็คเอ้าท์กี่บ้าน?',
 ];
 
-const todayStr = () => new Date().toLocaleDateString('sv-SE');
+const todayStr = () => {
+  const d = new Date();
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear() + 543; // แปลงเป็น พ.ศ.
+
+  return `${day}-${month}-${year}`;
+};
 
 export default function AIAssistant() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
