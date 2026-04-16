@@ -159,8 +159,8 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
             ...historyForAPI,
             { role: 'user', content: msg },
           ],
-          max_tokens: 2500,
-          temperature: 0.1,
+          max_tokens: 2000,
+          temperature: 0.3,
         }),
       });
 
