@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
-console.log("supabase:", supabase);
+
 const OPENROUTER_FREE_MODELS = [
   { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (Free)' },
   { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
@@ -22,12 +22,7 @@ const QUICK_QUESTIONS = [
 const todayStr = () => new Date().toLocaleDateString('sv-SE');
 
 export default function AIAssistant() {
-  const [apiKey, setApiKey] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('openrouter_api_key') || '';
-  }
-  return '';
-});
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
@@ -45,49 +40,42 @@ export default function AIAssistant() {
   }, [messages, loading]);
 
   const fetchAllData = async () => {
-    try {
-      console.log("เริ่มดึงข้อมูล...");
-      const today = todayStr();
-      
-      // ดึงข้อมูลแบบแยกกัน เพื่อไม่ให้ตัวหนึ่งพังแล้วพังหมด
-      const { data: bookings, error: bErr } = await supabase.from('bookings').select('*').limit(100);
-      const { data: customers, error: cErr } = await supabase.from('customers').select('*').limit(100);
-      const { data: ops, error: oErr } = await supabase.from('booking_ops').select('*').limit(100);
+    const today = todayStr();
+    const [
+      { data: bookings },
+      { data: customers },
+      { data: ops },
+    ] = await Promise.all([
+      supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(200),
+      supabase.from('customers').select('*').limit(200),
+      supabase.from('booking_ops').select('*').limit(200),
+    ]);
 
-      if (bErr) console.warn("Bookings Error:", bErr.message);
-      if (cErr) console.warn("Customers Error:", cErr.message);
-      if (oErr) console.warn("Ops Error:", oErr.message);
+    const opsMap = {};
+    (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
 
-      console.log("ดึงข้อมูลสำเร็จ:", { 
-        bookings: bookings?.length || 0, 
-        customers: customers?.length || 0 
-      });
-
-      const opsMap = {};
-      (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
-
-      return {
-        today,
-        totalBookings: (bookings || []).length,
-        bookings: (bookings || []).map(b => ({
-          id: b.id,
-          customerName: b.customer_name,
-          catNames: b.cat_names,
-          roomType: b.room_type,
-          startDate: b.start_date,
-          endDate: b.end_date,
-          totalPrice: b.total_price,
-          checkedIn: !!opsMap[b.id]?.checked_in,
-          checkedOut: !!opsMap[b.id]?.checked_out,
-        })),
-        customers: customers || [],
-      };
-    } catch (err) {
-      console.error("fetchAllData Error:", err);
-      return { today: todayStr(), bookings: [], customers: [], totalBookings: 0 };
-    }
+    return {
+      today,
+      totalBookings: (bookings||[]).length,
+      bookings: (bookings||[]).map(b => ({
+        id: b.id,
+        customerName: b.customer_name,
+        catNames: b.cat_names,
+        roomType: b.room_type,
+        startDate: b.start_date,
+        endDate: b.end_date,
+        phone: b.phone,
+        totalPrice: b.total_price,
+        notes: b.notes,
+        checkedIn: !!opsMap[b.id]?.checked_in,
+        checkedOut: !!opsMap[b.id]?.checked_out,
+        checkinTime: opsMap[b.id]?.checkin_time,
+        checkoutTime: opsMap[b.id]?.checkout_time,
+      })),
+      customers: (customers||[]).length > 0 ? customers : [],
+    };
   };
-  
+
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
     const todayCI = data.bookings.filter(b => b.startDate === data.today);
@@ -179,7 +167,6 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[800px] min-h-[500px]">
-      <div style={{ background: 'red' }}>
       {/* Header */}
       <div className="relative overflow-hidden bg-[#372C2E] rounded-[2rem] px-6 py-5 shadow-2xl shadow-[#372C2E]/20 mb-4 shrink-0">
         <div className="absolute -top-4 -right-4 text-8xl opacity-[0.05] rotate-12 select-none">✨</div>
@@ -226,7 +213,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
                   type={showKey ? 'text' : 'password'}
                   value={keyInput}
                   onChange={e => setKeyInput(e.target.value)}
-                  placeholder="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"
+                  placeholder="sk-or-v1-..."
                   className="w-full bg-white/10 border border-white/20 text-white text-xs font-mono rounded-xl px-3 py-2 outline-none focus:border-[#DE9E48] pr-8"
                 />
                 <button onClick={() => setShowKey(v => !v)}
