@@ -6,11 +6,12 @@ import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, Chevro
 const HARDCODED_API_KEY = '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';
 
 const OPENROUTER_MODELS = [
-  { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 🔥 (แนะนำ)' },
-  { id: 'google/gemini-2.5-flash-preview:free', label: 'Gemini 2.5 Flash' },
-  { id: 'meta-llama/llama-4-maverick:free', label: 'Llama 4 Maverick' },
-  { id: 'qwen/qwen3-235b-a22b:free', label: 'Qwen3 235B' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
+  { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
+  { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
+  { id: 'qwen/qwen3-coder:free', label: 'Qwen Coder' },
+  { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
 ];
 
 const QUICK_QUESTIONS = [
@@ -136,7 +137,7 @@ ${data.การจองทั้งหมด.map(b =>
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วง 14-20 เมษา มีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+   { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมเป็น AI ผู้ช่วยของโรงแรมแมวจริงใจ ถามผมได้เลยเกี่ยวกับข้อมูลการจอง ลูกค้า รายได้ หรืออะไรก็ตามที่เกี่ยวกับโรงแรม!' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -231,25 +232,24 @@ export default function AIAssistant() {
       // Keep last 6 messages for context (not too long)
       const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${activeKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Jingjai Cat Hotel AI',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...history,
-            { role: 'user', content: msg },
-          ],
-          max_tokens: 1500,
-          temperature: 0.2, // ต่ำ = ตอบแม่นยำกว่า
-        }),
-      });
+const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${activeKey}`,
+    'Accept': 'application/json',
+  },
+  body: JSON.stringify({
+    model: model || 'openai/gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...history,
+      { role: 'user', content: msg },
+    ],
+    max_tokens: 1500,
+    temperature: 0.2,
+  }),
+});
 
       const json = await res.json();
       if (json.error) {
