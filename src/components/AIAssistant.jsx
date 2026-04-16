@@ -108,6 +108,7 @@ ${JSON.stringify(data.bookings, null, 0)}
 ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stringify(data.customers, null, 0)}` : ''}
 
 กรุณา:
+- ตอบเป็นภาษาไทยเสมอกรุณา:
 - ตอบเป็นภาษาไทยเสมอ
 - ห้ามแสดงโค้ดทุกชนิด (เช่น JSON, {}, [], ``` )
 - ห้ามแสดง raw data จากระบบ
@@ -118,8 +119,8 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 - สรุปข้อมูลให้ชัดเจน กระชับ เข้าใจง่าย
 - ถ้าไม่พบข้อมูล ให้บอกตามตรง
 - ใช้ emoji เล็กน้อยเพื่อให้น่าอ่าน
-- ถ้ามีตัวเลขให้แสดงให้ชัดเจน`;
-  };
+- ถ้ามีตัวเลขให้แสดงให้ชัดเจน;
+};
 
   const saveApiKey = () => {
     localStorage.setItem('openrouter_api_key', keyInput);
