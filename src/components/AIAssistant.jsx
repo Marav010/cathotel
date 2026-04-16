@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 // ========== CONFIG ==========
+const HARDCODED_API_KEY = 'sk-or-v1-xxxx';
 
 const OPENROUTER_MODELS = [
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
