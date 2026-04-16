@@ -135,55 +135,55 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
     setShowKeyPanel(false);
   };
 
-  const sendMessage = async (text) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
-    if (!apiKey) { setShowKeyPanel(true); return; }
+const sendMessage = async (text) => {
+  const msg = text || input.trim();
+  if (!msg || loading) return;
+  if (!apiKey) { setShowKeyPanel(true); return; }
 
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg }]);
-    setLoading(true);
+  setInput('');
+  setMessages(prev => [...prev, { role: 'user', content: msg }]);
+  setLoading(true);
 
-    try {
-      // Fetch fresh data every time
-      const data = await fetchAllData();
-      setContextData(data);
-      const systemPrompt = buildSystemPrompt(data);
+  try {
+    const data = await fetchAllData();
+    const systemPrompt = buildSystemPrompt(data);
 
-      const historyForAPI = messages.slice(-8).map(m => ({ role: m.role, content: m.content }));
-
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Jingjai Cat Hotel',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...historyForAPI,
-            { role: 'user', content: msg },
-          ],
-          max_tokens: 1000,
-          temperature: 0.3,
-        }),
-      });
+          contents: [
+            {
+              parts: [
+                {
+                  text: systemPrompt + "\n\nUser: " + msg
+                }
+              ]
+            }
+          ]
+        })
+      }
+    );
 
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message || 'API Error');
-      const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ เกิดข้อผิดพลาด: ${err.message}\n\nกรุณาตรวจสอบ API Key และลองใหม่อีกครั้ง`,
-      }]);
-    }
-    setLoading(false);
-  };
+    const json = await res.json();
+
+    const reply =
+      json.candidates?.[0]?.content?.parts?.[0]?.text ||
+      'ไม่ได้รับคำตอบ';
+
+    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+
+  } catch (err) {
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `❌ เกิดข้อผิดพลาด: ${err.message}`,
+    }]);
+  }
+
+  setLoading(false);
+};
 
   const clearChat = () => {
     setMessages([{ role: 'assistant', content: 'สวัสดีครับ! 🐱 ถามได้เลยครับ เกี่ยวกับข้อมูลในโรงแรมแมวจริงใจ' }]);
