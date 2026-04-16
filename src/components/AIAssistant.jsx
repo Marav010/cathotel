@@ -300,6 +300,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
           ใช้ OpenRouter Free Models • ข้อมูลดึงจาก Supabase โดยตรง
         </p>
       </div>
-    </div>
+      console.log("AI Component Loaded");
+    </div>    
   );
 }
