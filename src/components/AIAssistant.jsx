@@ -164,21 +164,23 @@ export default function AIAssistant() {
         .from('app_settings')
         .select('value')
         .eq('key', 'openrouter_api_key')
-        .single();
-      if (data?.value && data.value !== HARDCODED_API_KEY) {
-        setActiveKey(data.value);
-        setCustomKey(data.value);
-        setKeyStatus('custom');
-      } else {
-        setActiveKey(HARDCODED_API_KEY);
-        setKeyStatus('ready');
-      }
-    } catch {
-      // Table might not exist yet — use hardcoded key
+        .maybeSingle();
+     if (error) throw error;
+
+    if (data?.value) {
+      setActiveKey(data.value);
+      setCustomKey(data.value);
+      setKeyStatus('custom');
+    } else {
       setActiveKey(HARDCODED_API_KEY);
       setKeyStatus('ready');
     }
-  };
+  } catch (err) {
+    console.log('load key error:', err);
+    setActiveKey(HARDCODED_API_KEY);
+    setKeyStatus('ready');
+  }
+};
 
   // Save API key to Supabase (shared across all devices)
   const saveSharedKey = async () => {
@@ -219,56 +221,89 @@ export default function AIAssistant() {
     setShowKeyPanel(false);
   };
 
-  const sendMessage = async (text) => {
-    const msg = (text || input).trim();
-    if (!msg || loading) return;
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg }]);
-    setLoading(true);
+const sendMessage = async (text) => {
+  const msg = (text || input).trim();
+  if (!msg || loading) return;
 
-    try {
-      const data = await fetchHotelData();
-      const systemPrompt = buildSystemPrompt(data);
-      // Keep last 6 messages for context (not too long)
-      const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+  setInput('');
+  setMessages(prev => [...prev, { role: 'user', content: msg }]);
+  setLoading(true);
 
-const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${activeKey}`,
-    'Accept': 'application/json',
-  },
-  body: JSON.stringify({
-    model: model || 'openai/gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...history,
-      { role: 'user', content: msg },
-    ],
-    max_tokens: 1500,
-    temperature: 0.2,
-  }),
-});
+  try {
+    const safeKey = activeKey || HARDCODED_API_KEY;
 
-      const json = await res.json();
-      if (json.error) {
-        const errMsg = json.error.message || '';
-        if (errMsg.includes('rate limit') || errMsg.includes('quota')) {
-          throw new Error('โมเดลนี้ถูกใช้งานเยอะเกินไป กรุณาเปลี่ยนโมเดลแล้วลองใหม่ครับ');
-        }
-        throw new Error(errMsg || 'API Error');
-      }
-      const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ ${err.message}\n\nลองเปลี่ยนโมเดลแล้วถามใหม่ครับ`,
-      }]);
+    if (!safeKey) {
+      throw new Error('❌ ไม่มี API Key กรุณาตั้งค่าก่อน');
     }
-    setLoading(false);
-  };
+
+    console.log('Using key:', safeKey); // debug
+
+    const data = await fetchHotelData();
+    const systemPrompt = buildSystemPrompt(data);
+
+    const history = messages.slice(-6).map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${safeKey}`,
+      },
+      body: JSON.stringify({
+        model: model || 'openai/gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history,
+          { role: 'user', content: msg },
+        ],
+        max_tokens: 1500,
+        temperature: 0.2,
+      }),
+    });
+
+    const json = await res.json();
+    console.log('OpenRouter response:', json); // debug
+
+    // ❌ handle error ให้ครบ
+    if (!res.ok || json.error) {
+      const errMsg = json?.error?.message || '';
+
+      if (res.status === 401) {
+        throw new Error('❌ API Key ไม่ถูกต้อง หรือหมดอายุ');
+      }
+
+      if (errMsg.includes('rate limit')) {
+        throw new Error('⏳ โมเดลนี้คนใช้เยอะ ลองเปลี่ยนโมเดล');
+      }
+
+      throw new Error(errMsg || 'เกิดข้อผิดพลาดจาก AI');
+    }
+
+    const reply =
+      json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
+
+    setMessages(prev => [
+      ...prev,
+      { role: 'assistant', content: reply },
+    ]);
+
+  } catch (err) {
+    console.error(err);
+
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: err.message || '❌ เกิดข้อผิดพลาด',
+      },
+    ]);
+  }
+
+  setLoading(false);
+};
 
   const clearChat = () => {
     setMessages([{ role: 'assistant', content: 'เริ่มการสนทนาใหม่แล้วครับ 🐱 ถามได้เลย!' }]);
