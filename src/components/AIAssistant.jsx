@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
-
+console.log("supabase:", supabase);
 const OPENROUTER_FREE_MODELS = [
   { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (Free)' },
   { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
@@ -22,7 +22,12 @@ const QUICK_QUESTIONS = [
 const todayStr = () => new Date().toLocaleDateString('sv-SE');
 
 export default function AIAssistant() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openrouter_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('openrouter_api_key') || '';
+  }
+  return '';
+});
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
@@ -174,6 +179,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] max-h-[800px] min-h-[500px]">
+      <div style={{ background: 'red' }}>
       {/* Header */}
       <div className="relative overflow-hidden bg-[#372C2E] rounded-[2rem] px-6 py-5 shadow-2xl shadow-[#372C2E]/20 mb-4 shrink-0">
         <div className="absolute -top-4 -right-4 text-8xl opacity-[0.05] rotate-12 select-none">✨</div>
