@@ -160,7 +160,7 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
             { role: 'user', content: msg },
           ],
           max_tokens: 2500,
-          temperature: 0.3,
+          temperature: 0.1,
         }),
       });
 
