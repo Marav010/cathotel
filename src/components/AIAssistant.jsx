@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
 
 const OPENROUTER_FREE_MODELS = [
-  { id: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 (Free Tier)' },
-  { id: 'meta-llama/llama-3-8b-instruct', label: 'Llama 3 8B (Free)' },
-  { id: 'mistralai/mistral-7b-instruct', label: 'Mistral 7B (Free)' },
-  { id: 'google/gemma-7b-it', label: 'Gemma 7B (Free)' },
-  { id: 'nousresearch/nous-hermes-2-mixtral-8x7b-dpo', label: 'Mixtral Hermes (Free)' },
+  { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (Free)' },
+  { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
+  { id: 'meta-llama/llama-4-scout:free', label: 'Llama 4 Scout (Free)' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small (Free)' },
+  { id: 'qwen/qwen3-14b:free', label: 'Qwen3 14B (Free)' },
 ];
 
 const QUICK_QUESTIONS = [
@@ -75,31 +75,7 @@ export default function AIAssistant() {
       customers: (customers||[]).length > 0 ? customers : [],
     };
   };
-const tryFetchAI = async (payload) => {
-  const modelsToTry = [
-    model,
-    'meta-llama/llama-3-8b-instruct',
-    'mistralai/mistral-7b-instruct'
-  ];
 
-  for (const m of modelsToTry) {
-    try {
-   const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    contents: [
-      {
-        parts: [{ text: systemPrompt + "\n\nUser: " + msg }]
-      }
-    ]
-  })
-});
-
-const json = await res.json();
-const reply = json.candidates?.[0]?.content?.parts?.[0]?.text || 'ไม่ได้รับคำตอบ';
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
     const todayCI = data.bookings.filter(b => b.startDate === data.today);
@@ -135,55 +111,55 @@ ${data.customers.length > 0 ? `ข้อมูลลูกค้า: ${JSON.stri
     setShowKeyPanel(false);
   };
 
-const sendMessage = async (text) => {
-  const msg = text || input.trim();
-  if (!msg || loading) return;
-  if (!apiKey) { setShowKeyPanel(true); return; }
+  const sendMessage = async (text) => {
+    const msg = text || input.trim();
+    if (!msg || loading) return;
+    if (!apiKey) { setShowKeyPanel(true); return; }
 
-  setInput('');
-  setMessages(prev => [...prev, { role: 'user', content: msg }]);
-  setLoading(true);
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: msg }]);
+    setLoading(true);
 
-  try {
-    const data = await fetchAllData();
-    const systemPrompt = buildSystemPrompt(data);
+    try {
+      // Fetch fresh data every time
+      const data = await fetchAllData();
+      setContextData(data);
+      const systemPrompt = buildSystemPrompt(data);
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
+      const historyForAPI = messages.slice(-8).map(m => ({ role: m.role, content: m.content }));
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Jingjai Cat Hotel',
+        },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: systemPrompt + "\n\nUser: " + msg
-                }
-              ]
-            }
-          ]
-        })
-      }
-    );
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...historyForAPI,
+            { role: 'user', content: msg },
+          ],
+          max_tokens: 1000,
+          temperature: 0.3,
+        }),
+      });
 
-    const json = await res.json();
-
-    const reply =
-      json.candidates?.[0]?.content?.parts?.[0]?.text ||
-      'ไม่ได้รับคำตอบ';
-
-    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-
-  } catch (err) {
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content: `❌ เกิดข้อผิดพลาด: ${err.message}`,
-    }]);
-  }
-
-  setLoading(false);
-};
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message || 'API Error');
+      const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ เกิดข้อผิดพลาด: ${err.message}\n\nกรุณาตรวจสอบ API Key และลองใหม่อีกครั้ง`,
+      }]);
+    }
+    setLoading(false);
+  };
 
   const clearChat = () => {
     setMessages([{ role: 'assistant', content: 'สวัสดีครับ! 🐱 ถามได้เลยครับ เกี่ยวกับข้อมูลในโรงแรมแมวจริงใจ' }]);
@@ -324,6 +300,6 @@ const sendMessage = async (text) => {
           ใช้ OpenRouter Free Models • ข้อมูลดึงจาก Supabase โดยตรง
         </p>
       </div>
-    </div>    
+    </div>
   );
 }
