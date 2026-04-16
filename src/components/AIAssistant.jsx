@@ -40,42 +40,49 @@ export default function AIAssistant() {
   }, [messages, loading]);
 
   const fetchAllData = async () => {
-    const today = todayStr();
-    const [
-      { data: bookings },
-      { data: customers },
-      { data: ops },
-    ] = await Promise.all([
-      supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(200),
-      supabase.from('customers').select('*').limit(200),
-      supabase.from('booking_ops').select('*').limit(200),
-    ]);
+    try {
+      console.log("เริ่มดึงข้อมูล...");
+      const today = todayStr();
+      
+      // ดึงข้อมูลแบบแยกกัน เพื่อไม่ให้ตัวหนึ่งพังแล้วพังหมด
+      const { data: bookings, error: bErr } = await supabase.from('bookings').select('*').limit(100);
+      const { data: customers, error: cErr } = await supabase.from('customers').select('*').limit(100);
+      const { data: ops, error: oErr } = await supabase.from('booking_ops').select('*').limit(100);
 
-    const opsMap = {};
-    (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
+      if (bErr) console.warn("Bookings Error:", bErr.message);
+      if (cErr) console.warn("Customers Error:", cErr.message);
+      if (oErr) console.warn("Ops Error:", oErr.message);
 
-    return {
-      today,
-      totalBookings: (bookings||[]).length,
-      bookings: (bookings||[]).map(b => ({
-        id: b.id,
-        customerName: b.customer_name,
-        catNames: b.cat_names,
-        roomType: b.room_type,
-        startDate: b.start_date,
-        endDate: b.end_date,
-        phone: b.phone,
-        totalPrice: b.total_price,
-        notes: b.notes,
-        checkedIn: !!opsMap[b.id]?.checked_in,
-        checkedOut: !!opsMap[b.id]?.checked_out,
-        checkinTime: opsMap[b.id]?.checkin_time,
-        checkoutTime: opsMap[b.id]?.checkout_time,
-      })),
-      customers: (customers||[]).length > 0 ? customers : [],
-    };
+      console.log("ดึงข้อมูลสำเร็จ:", { 
+        bookings: bookings?.length || 0, 
+        customers: customers?.length || 0 
+      });
+
+      const opsMap = {};
+      (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
+
+      return {
+        today,
+        totalBookings: (bookings || []).length,
+        bookings: (bookings || []).map(b => ({
+          id: b.id,
+          customerName: b.customer_name,
+          catNames: b.cat_names,
+          roomType: b.room_type,
+          startDate: b.start_date,
+          endDate: b.end_date,
+          totalPrice: b.total_price,
+          checkedIn: !!opsMap[b.id]?.checked_in,
+          checkedOut: !!opsMap[b.id]?.checked_out,
+        })),
+        customers: customers || [],
+      };
+    } catch (err) {
+      console.error("fetchAllData Error:", err);
+      return { today: todayStr(), bookings: [], customers: [], totalBookings: 0 };
+    }
   };
-
+  
   const buildSystemPrompt = (data) => {
     const activeNow = data.bookings.filter(b => b.checkedIn && !b.checkedOut);
     const todayCI = data.bookings.filter(b => b.startDate === data.today);
