@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Send, Loader2, RefreshCw, Bot, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
 
 const OPENROUTER_FREE_MODELS = [
-  { id: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (Free)' },
-  { id: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
-  { id: 'meta-llama/llama-4-scout:free', label: 'Llama 4 Scout (Free)' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small (Free)' },
-  { id: 'qwen/qwen3-14b:free', label: 'Qwen3 14B (Free)' },
+  { id: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 (Free Tier)' },
+  { id: 'meta-llama/llama-3-8b-instruct', label: 'Llama 3 8B (Free)' },
+  { id: 'mistralai/mistral-7b-instruct', label: 'Mistral 7B (Free)' },
+  { id: 'google/gemma-7b-it', label: 'Gemma 7B (Free)' },
+  { id: 'nousresearch/nous-hermes-2-mixtral-8x7b-dpo', label: 'Mixtral Hermes (Free)' },
 ];
 
 const QUICK_QUESTIONS = [
