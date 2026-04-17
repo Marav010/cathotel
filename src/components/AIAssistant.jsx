@@ -532,7 +532,7 @@ export default function AIAssistant() {
           </button>
         </div>
         <p className="text-center text-[10px] text-[#C4A99A] mt-2 font-bold">
-          เชื่อมต่อ: bookings · booking_ops · booking_playtime · customers · rooms · shop_products
+          ทดสอบระบบAIผู้ช่วย
         </p>
       </div>
     </div>
