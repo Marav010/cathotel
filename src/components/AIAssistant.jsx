@@ -394,8 +394,8 @@ export default function AIAssistant() {
             </div>
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
-              <h2 className="text-xl font-black text-white tracking-tight">จิงใจ AI ผู้ช่วยโรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">เชื่อมต่อครบ 6 ตาราง • ดึงข้อมูลสดทุกครั้ง</p>
+              <h2 className="text-xl font-black text-white tracking-tight">จิงจิง AI ผู้ช่วยโรงแรมแมว</h2>
+              <p className="text-white/40 text-xs mt-0.5">AI ผู้ช่วยโรงแรมแมว สอบถามได้ทุกอย่าง</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
@@ -426,9 +426,9 @@ export default function AIAssistant() {
             <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
               <Database size={14} className="text-[#DE9E48] mt-0.5 shrink-0" />
               <div>
-                <p className="text-white font-black text-xs">Key เก็บใน Supabase (ตาราง app_settings) — ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
+                <p className="text-white font-black text-xs">Key ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
                 <p className="text-white/50 text-[11px] mt-1">
-                  ตาราง app_settings มีอยู่แล้วใน database ของคุณครับ ✓
+                 พร้อมใช้งาน✓
                 </p>
               </div>
             </div>
@@ -456,7 +456,7 @@ export default function AIAssistant() {
             {keyState === 'ready' && apiKey && (
               <div className="flex items-center gap-2 text-green-300 text-[11px] font-bold">
                 <CheckCircle2 size={13}/>
-                <span>พร้อมใช้งาน {keySource === 'supabase' ? '(เก็บใน Supabase — ทุกเครื่องใช้ได้)' : '(เก็บในเครื่องนี้เท่านั้น)'}</span>
+                <span>พร้อมใช้งาน {keySource === 'supabase' ? '(ทุกเครื่องใช้ได้)' : '(เก็บในเครื่องนี้เท่านั้น)'}</span>
               </div>
             )}
           </div>
