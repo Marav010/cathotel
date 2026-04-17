@@ -34,9 +34,18 @@ const getTodayTH  = () => new Date().toLocaleDateString('th-TH', {
 const fetchHotelData = async () => {
   const today = getTodayStr();
 
-  const [{ data: bookings }, { data: ops }] = await Promise.all([
-    supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
-    supabase.from('booking_ops').select('*').limit(300),
+  const [
+  { data: bookings }, 
+  { data: ops }, 
+  { data: customers }, 
+  { data: rooms }, 
+  { data: playtimes }] = await Promise.all([
+  supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
+  supabase.from('booking_ops').select('*').limit(300),
+  supabase.from('customers').select('*').limit(300),
+  supabase.from('rooms').select('*').limit(300),
+  supabase.from('booking_playtime').select('*').limit(300),
+
   ]);
 
   // สร้าง opsMap ก่อน
