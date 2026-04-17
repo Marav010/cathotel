@@ -34,7 +34,11 @@ const fetchHotelData = async () => {
   const [{ data: bookings }, { data: ops }] = await Promise.all([
     supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
     supabase.from('booking_ops').select('*').limit(300),
+    supabase.from('customers').select('*').limit(300),
+    supabase.from('rooms').select('*').limit(300),
+    supabase.from('booking_playtime').select('*').limit(300),
   ]);
+  
 
   const opsMap = {};
   (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
@@ -82,7 +86,7 @@ const fetchHotelData = async () => {
 };
 
 // ── System Prompt ─────────────────────────────────────────────────────────
-const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
+const buildSystemPrompt = (data) => `คุณชื่อ "จริงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
 วันนี้: ${data.todayTH}
 
 ━━━ ภาพรวมโรงแรมวันนี้ ━━━
@@ -145,7 +149,7 @@ async function saveKeyToSupabase(key) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วงเทศกาลมีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงจิง AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วงเทศกาลมีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
