@@ -7,11 +7,11 @@ import {
 
 // ── Models ────────────────────────────────────────────────────────────────
 const OPENROUTER_FREE_MODELS = [
-  { id: 'openai/gpt-oss-120b:free',               label: 'GPT OSS 120B แนะนำ' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
-  { id: 'google/gemma-4-31b-it:free',             label: 'Gemma 4 31B' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
-  { id: 'qwen/qwen3-coder:free',                  label: 'Qwen Coder' },
+  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B ⭐ แนะนำ' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free',    label: 'Nemotron 120B' },
+  { id: 'google/gemma-4-31b-it:free',                label: 'Gemma 4 31B' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B' },
+  { id: 'qwen/qwen3-coder:free',                     label: 'Qwen Coder' },
   { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
 ];
 
@@ -30,91 +30,154 @@ const getTodayTH  = () => new Date().toLocaleDateString('th-TH', {
   weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
 });
 
-// ── Fetch all hotel data from Supabase ────────────────────────────────────
+// ── Fetch ALL hotel data from Supabase ────────────────────────────────────
+// ตาราง: bookings, booking_ops, booking_playtime, customers, rooms, shop_products, app_settings
 const fetchHotelData = async () => {
   const today = getTodayStr();
 
+  // ดึงทุกตารางพร้อมกัน
   const [
     { data: bookings },
     { data: ops },
+    { data: playtimes },
     { data: customers },
     { data: rooms },
-    { data: playtimes }
+    { data: shopProducts },
   ] = await Promise.all([
-    supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
-    supabase.from('booking_ops').select('*').limit(300),
+    supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(500),
+    supabase.from('booking_ops').select('*').limit(500),
+    supabase.from('booking_playtime').select('*').order('play_date', { ascending: false }).limit(500),
     supabase.from('customers').select('*').limit(300),
-    supabase.from('rooms').select('*').limit(300),
-    supabase.from('booking_playtime').select('*').limit(300),
+    supabase.from('rooms').select('*').limit(50),
+    supabase.from('shop_products').select('*').limit(200),
   ]);
 
-  // ✅ map booking_ops
+  // ── opsMap: booking_id → ops ──
   const opsMap = {};
-  (ops || []).forEach(o => {
-    opsMap[o.booking_id] = o;
+  (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
+
+  // ── customersMap: id → customer ──
+  const customersMap = {};
+  (customers || []).forEach(c => { customersMap[c.id] = c; });
+
+  // ── playtimeMap: booking_id → [sessions] ──
+  const playtimeMap = {};
+  (playtimes || []).forEach(p => {
+    if (!playtimeMap[p.booking_id]) playtimeMap[p.booking_id] = [];
+    playtimeMap[p.booking_id].push(p);
   });
 
-  // ✅ map customers
-  const customerMap = {};
-  (customers || []).forEach(c => {
-    customerMap[c.id] = c;
-  });
-
-  // ✅ merge data
+  // ── enrich bookings ──
   const enriched = (bookings || []).map(b => {
-    const op = opsMap[b.id] || {};
-    const customer = customerMap[b.customer_id] || {};
-
+    const op  = opsMap[b.id] || {};
+    const cus = customersMap[b.customer_id] || {};
     const isCI = !!op.checked_in;
     const isCO = !!op.checked_out;
-
+    const sessions = playtimeMap[b.id] || [];
+    const todayPlay = sessions.filter(p => p.play_date === today);
     return {
+      id:             b.id,
       บ้าน:          b.room_type,
-      ชื่อลูกค้า:    customer.customer_name || b.customer_name || '-',
+      ชื่อลูกค้า:    b.customer_name,
       ชื่อแมว:       b.cat_names,
-      เบอร์โทร:      customer.phone || '-',
+      เบอร์โทร:      b.phone || cus.phone || '-',
       วันเช็คอิน:    b.start_date,
       วันเช็คเอ้าท์: b.end_date,
-      ราคารวม:       b.total_price
-        ? `${Number(b.total_price).toLocaleString()} บาท`
-        : '-',
-      หมายเหตุ:      b.note || '-',
-      สถานะ:         isCO
-        ? 'เช็คเอ้าท์แล้ว'
-        : isCI
-        ? 'กำลังพักอยู่'
-        : 'ยังไม่เช็คอิน',
-      เวลาเช็คอิน:   op.checkin_time || '-',
+      ราคารวม:       b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
+      มัดจำ:         b.deposit      ? `${Number(b.deposit).toLocaleString()} บาท`       : '-',
+      วางมัดจำแล้ว:  b.is_deposited ? 'แล้ว' : 'ยังไม่วาง',
+      หมายเหตุ:      b.note || b.notes || '-',
+      สถานะการจอง:   b.booking_status || '-',
+      สีบัญชี:       b.color_hex || '-',
+      สถานะ:         isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
+      เวลาเช็คอิน:   op.checkin_time   || '-',
       เวลาเช็คเอ้าท์: op.checkout_time || '-',
+      รอบเล่นวันนี้: todayPlay.length > 0
+        ? todayPlay.map(p => `${p.session}(ออก:${p.released_at}${p.returned_at?'/กลับ:'+p.returned_at:''})`).join(', ')
+        : 'ยังไม่ปล่อย',
+      // ข้อมูลลูกค้าเพิ่มเติม
+      นิสัยการกิน:   cus.eating_habit || '-',
+      แหล่งที่รู้จัก: cus.source       || '-',
     };
   });
 
-  const staying = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
-  const ciToday = enriched.filter(b => b.วันเช็คอิน === today);
-  const coToday = enriched.filter(b => b.วันเช็คเอ้าท์ === today);
+  // ── filters ──
+  const staying  = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
+  const ciToday  = enriched.filter(b => b.วันเช็คอิน    === today);
+  const coToday  = enriched.filter(b => b.วันเช็คเอ้าท์ === today);
 
-  const thisMonth = today.slice(0, 7);
-
+  // ── monthly revenue ──
+  const thisMonth    = today.slice(0, 7);
   const monthRevenue = (bookings || [])
     .filter(b => b.start_date?.startsWith(thisMonth))
-    .reduce((sum, b) => sum + (Number(b.total_price) || 0), 0);
+    .reduce((s, b) => s + (Number(b.total_price) || 0), 0);
+
+  // ── rooms info ──
+  const roomsInfo = (rooms || []).map(r => ({
+    ประเภทห้อง:    r.room_type,
+    จำนวนห้อง:    r.total_count,
+    ราคาต่อคืน:   r.price_per_night ? `${Number(r.price_per_night).toLocaleString()} บาท` : '-',
+  }));
+
+  // ── shop products ──
+  const shopInfo = (shopProducts || [])
+    .filter(p => p.visible !== false)
+    .map(p => ({
+      สินค้า:   p.name,
+      หมวดหมู่: p.category,
+      ราคา:     p.price ? `${Number(p.price).toLocaleString()} ${p.unit||''}` : '-',
+      สต็อก:    p.stock ?? '-',
+    }));
+
+  // ── customer stats ──
+  const customerBookingCount = {};
+  (bookings || []).forEach(b => {
+    const key = b.customer_name;
+    customerBookingCount[key] = (customerBookingCount[key] || 0) + 1;
+  });
+  const topCustomers = Object.entries(customerBookingCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => `${name} (${count} ครั้ง)`);
+
+  // ── room popularity ──
+  const roomPopularity = {};
+  (bookings || []).forEach(b => {
+    roomPopularity[b.room_type] = (roomPopularity[b.room_type] || 0) + 1;
+  });
+  const topRooms = Object.entries(roomPopularity)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => `${type} (${count} ครั้ง)`);
 
   return {
     today,
     todayTH: getTodayTH(),
     summary: {
-      รายการจองทั้งหมด: enriched.length,
+      รายการจองทั้งหมด:  enriched.length,
       กำลังพักอยู่ตอนนี้: staying.length,
-      เช็คอินวันนี้: ciToday.length,
-      เช็คเอ้าท์วันนี้: coToday.length,
-      รายได้เดือนนี้: `${monthRevenue.toLocaleString()} บาท`,
+      เช็คอินวันนี้:      ciToday.length,
+      เช็คเอ้าท์วันนี้:  coToday.length,
+      รายได้เดือนนี้:    `${monthRevenue.toLocaleString()} บาท`,
+      จำนวนลูกค้าทั้งหมด: (customers || []).length,
     },
     กำลังพักอยู่ตอนนี้: staying,
-    เช็คอินวันนี้: ciToday,
-    เช็คเอ้าท์วันนี้: coToday,
-    การจองทั้งหมด: enriched,
+    เช็คอินวันนี้:       ciToday,
+    เช็คเอ้าท์วันนี้:   coToday,
+    การจองทั้งหมด:      enriched,
+    ข้อมูลห้องพัก:      roomsInfo,
+    สินค้าในร้าน:       shopInfo,
+    ลูกค้าจองบ่อย:      topCustomers,
+    ห้องที่นิยม:        topRooms,
+    ลูกค้าทั้งหมด:      (customers || []).map(c => ({
+      ชื่อ:     c.customer_name,
+      เบอร์:    c.phone || '-',
+      แหล่งที่รู้จัก: c.source || '-',
+      นิสัยการกิน: c.eating_habit || '-',
+      หมายเหตุ: c.note || '-',
+    })),
   };
 };
+
 // ── System Prompt ─────────────────────────────────────────────────────────
 const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
 วันนี้: ${data.todayTH}
@@ -122,52 +185,65 @@ const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" 
 ━━━ ภาพรวมโรงแรมวันนี้ ━━━
 ${Object.entries(data.summary).map(([k, v]) => `• ${k}: ${v}`).join('\n')}
 
+━━━ ประเภทห้องพักและราคา ━━━
+${data.ข้อมูลห้องพัก.map(r => `• ${r.ประเภทห้อง} | ${r.จำนวนห้อง} ห้อง | ${r.ราคาต่อคืน}/คืน`).join('\n') || '• ไม่มีข้อมูล'}
+
 ━━━ บ้านที่กำลังพักอยู่ตอนนี้ (${data.กำลังพักอยู่ตอนนี้.length} บ้าน) ━━━
 ${data.กำลังพักอยู่ตอนนี้.length > 0
   ? data.กำลังพักอยู่ตอนนี้.map(b =>
-      `• ${b.บ้าน} — ${b.ชื่อลูกค้า} (🐱${b.ชื่อแมว}) เช็คเอ้าท์: ${b.วันเช็คเอ้าท์} เบอร์: ${b.เบอร์โทร}`
+      `• [${b.บ้าน}] ${b.ชื่อลูกค้า} | 🐱${b.ชื่อแมว} | 📱${b.เบอร์โทร} | เช็คเอ้าท์: ${b.วันเช็คเอ้าท์} | รอบเล่นวันนี้: ${b.รอบเล่นวันนี้}`
     ).join('\n')
   : '• ไม่มี'}
 
 ━━━ เช็คอินวันนี้ (${data.เช็คอินวันนี้.length} บ้าน) ━━━
 ${data.เช็คอินวันนี้.length > 0
   ? data.เช็คอินวันนี้.map(b =>
-      `• ${b.บ้าน} — ${b.ชื่อลูกค้า} (🐱${b.ชื่อแมว}) สถานะ: ${b.สถานะ}`
+      `• [${b.บ้าน}] ${b.ชื่อลูกค้า} | 🐱${b.ชื่อแมว} | 📱${b.เบอร์โทร} | สถานะ: ${b.สถานะ} | มัดจำ: ${b.วางมัดจำแล้ว}`
     ).join('\n')
   : '• ไม่มี'}
 
 ━━━ เช็คเอ้าท์วันนี้ (${data.เช็คเอ้าท์วันนี้.length} บ้าน) ━━━
 ${data.เช็คเอ้าท์วันนี้.length > 0
   ? data.เช็คเอ้าท์วันนี้.map(b =>
-      `• ${b.บ้าน} — ${b.ชื่อลูกค้า} (🐱${b.ชื่อแมว}) สถานะ: ${b.สถานะ}`
+      `• [${b.บ้าน}] ${b.ชื่อลูกค้า} | 🐱${b.ชื่อแมว} | สถานะ: ${b.สถานะ}`
     ).join('\n')
   : '• ไม่มี'}
 
+━━━ ห้องที่ได้รับความนิยม ━━━
+${data.ห้องที่นิยม.map((r, i) => `${i+1}. ${r}`).join('\n') || '• ไม่มีข้อมูล'}
+
+━━━ ลูกค้าที่จองบ่อยที่สุด ━━━
+${data.ลูกค้าจองบ่อย.map((c, i) => `${i+1}. ${c}`).join('\n') || '• ไม่มีข้อมูล'}
+
+━━━ สินค้าในร้าน (${data.สินค้าในร้าน.length} รายการ) ━━━
+${data.สินค้าในร้าน.slice(0, 20).map(p => `• [${p.หมวดหมู่}] ${p.สินค้า} | ${p.ราคา} | สต็อก: ${p.สต็อก}`).join('\n') || '• ไม่มีข้อมูล'}
+
+━━━ ข้อมูลลูกค้าทั้งหมด (${data.ลูกค้าทั้งหมด.length} คน) ━━━
+${data.ลูกค้าทั้งหมด.map(c => `• ${c.ชื่อ} | 📱${c.เบอร์} | รู้จักจาก: ${c.แหล่งที่รู้จัก} | กิน: ${c.นิสัยการกิน}`).join('\n') || '• ไม่มีข้อมูล'}
+
 ━━━ ข้อมูลการจองทั้งหมด (${data.การจองทั้งหมด.length} รายการ) ━━━
 ${data.การจองทั้งหมด.map(b =>
-  `[${b.บ้าน}] ${b.ชื่อลูกค้า} | 🐱${b.ชื่อแมว} | 📱${b.เบอร์โทร} | ${b.วันเช็คอิน}→${b.วันเช็คเอ้าท์} | ${b.ราคารวม} | ${b.สถานะ}`
+  `[${b.บ้าน}] ${b.ชื่อลูกค้า} | 🐱${b.ชื่อแมว} | 📱${b.เบอร์โทร} | ${b.วันเช็คอิน}→${b.วันเช็คเอ้าท์} | ${b.ราคารวม} | มัดจำ:${b.วางมัดจำแล้ว} | ${b.สถานะ}`
 ).join('\n')}
 
 ━━━ กฎการตอบ ━━━
 1. ตอบภาษาไทยเท่านั้น ห้ามมีภาษาอังกฤษนอกจากชื่อเฉพาะ
 2. ตอบเหมือนพนักงานโรงแรมที่รู้จักลูกค้าดี สุภาพ กระชับ อ่านง่าย
 3. ห้ามแสดง JSON, โค้ด, หรือข้อมูลทางเทคนิคใดๆ ทั้งสิ้น
-4. ถ้าถามเรื่องเบอร์โทรหรือชื่อ → ตอบทันทีว่าเบอร์/ชื่อนั้นคือใคร อยู่บ้านไหน
+4. ถ้าถามเรื่องเบอร์/ชื่อ → ตอบทันทีว่าเป็นของใคร อยู่บ้านไหน
 5. ถ้าถามช่วงวันที่ → นับจากข้อมูลการจองทั้งหมด ตอบจำนวนและรายชื่อ
 6. ถ้าถามรายได้ → คำนวณจากราคารวมในข้อมูล แสดงตัวเลขให้ชัดเจน
 7. ถ้าถามว่าห้องว่างไหม → ดูจากการจองที่ทับซ้อนกันในช่วงนั้น
-8. ตอบให้ครบทุกรายการ ห้ามตัดข้อมูล
-9. แสดงวันที่ในรูปแบบ: วัน เดือน ปี (เช่น 17 เมษายน 2569)
-10. ห้ามบอกว่า "ไม่มีข้อมูล" ถ้าข้อมูลอยู่ในระบบ ให้ค้นหาให้ดีก่อนตอบ`;
+8. ถ้าถามมัดจำ → ดูจาก "วางมัดจำแล้ว" และ "มัดจำ" ของแต่ละบ้าน
+9. ถ้าถามรอบปล่อยเล่น → ดูจาก "รอบเล่นวันนี้" ของแต่ละบ้าน
+10. ตอบให้ครบทุกรายการ ห้ามตัดข้อมูล
+11. ห้ามบอกว่า "ไม่มีข้อมูล" ถ้าข้อมูลอยู่ในระบบ ให้ค้นหาให้ดีก่อนตอบ`;
 
 // ── Supabase key storage ──────────────────────────────────────────────────
-const SETTINGS_TABLE = 'app_settings';
-const KEY_NAME       = 'openrouter_api_key';
-
 async function loadKeyFromSupabase() {
   try {
     const { data, error } = await supabase
-      .from(SETTINGS_TABLE).select('value').eq('key', KEY_NAME).single();
+      .from('app_settings').select('value').eq('key', 'openrouter_api_key').single();
     if (!error && data?.value) return data.value;
   } catch {}
   return null;
@@ -176,8 +252,8 @@ async function loadKeyFromSupabase() {
 async function saveKeyToSupabase(key) {
   try {
     const { error } = await supabase
-      .from(SETTINGS_TABLE)
-      .upsert({ key: KEY_NAME, value: key }, { onConflict: 'key' });
+      .from('app_settings')
+      .upsert({ key: 'openrouter_api_key', value: key }, { onConflict: 'key' });
     return !error;
   } catch { return false; }
 }
@@ -186,7 +262,7 @@ async function saveKeyToSupabase(key) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วงเทศกาลมีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -198,26 +274,20 @@ export default function AIAssistant() {
   const [keySource, setKeySource] = useState('');
   const bottomRef               = useRef(null);
 
-  // Load key from Supabase on mount
   useEffect(() => {
     (async () => {
       setKeyState('loading');
       const saved = await loadKeyFromSupabase();
       if (saved) {
-        setApiKey(saved);
-        setKeyInput(saved);
-        setKeyState('ready');
-        setKeySource('supabase');
+        setApiKey(saved); setKeyInput(saved);
+        setKeyState('ready'); setKeySource('supabase');
       } else {
         const local = localStorage.getItem('openrouter_key_fallback');
         if (local) {
-          setApiKey(local);
-          setKeyInput(local);
-          setKeyState('ready');
-          setKeySource('local');
+          setApiKey(local); setKeyInput(local);
+          setKeyState('ready'); setKeySource('local');
         } else {
-          setKeyState('empty');
-          setShowKeyPanel(true);
+          setKeyState('empty'); setShowKeyPanel(true);
         }
       }
     })();
@@ -232,16 +302,12 @@ export default function AIAssistant() {
     setKeyState('saving');
     const ok = await saveKeyToSupabase(keyInput.trim());
     if (ok) {
-      setApiKey(keyInput.trim());
-      setKeyState('saved');
-      setKeySource('supabase');
+      setApiKey(keyInput.trim()); setKeyState('saved'); setKeySource('supabase');
       setShowKeyPanel(false);
       setTimeout(() => setKeyState('ready'), 2000);
     } else {
       localStorage.setItem('openrouter_key_fallback', keyInput.trim());
-      setApiKey(keyInput.trim());
-      setKeyState('ready');
-      setKeySource('local');
+      setApiKey(keyInput.trim()); setKeyState('ready'); setKeySource('local');
       setShowKeyPanel(false);
     }
   };
@@ -273,8 +339,8 @@ export default function AIAssistant() {
             ...history,
             { role: 'user', content: msg },
           ],
-          max_tokens:  1500,
-          temperature: 0.2,
+          max_tokens:  2000,
+          temperature: 0.15,
         }),
       });
 
@@ -305,11 +371,11 @@ export default function AIAssistant() {
   };
 
   const keyBadge = (() => {
-    if (keyState === 'loading') return { text: '⏳ กำลังโหลด...',      cls: 'bg-white/10 border-white/20 text-white/60' };
-    if (keyState === 'empty')   return { text: '⚠️ ยังไม่มี API Key', cls: 'bg-red-500/20 border-red-400/40 text-red-300' };
-    if (keyState === 'saving')  return { text: '⏳ กำลังบันทึก...',    cls: 'bg-white/10 border-white/20 text-white/60' };
-    if (keyState === 'saved')   return { text: '✓ บันทึกแล้ว!',        cls: 'bg-green-500/20 border-green-400/40 text-green-300' };
-    if (keyState === 'error')   return { text: '❌ Key ผิดพลาด',        cls: 'bg-red-500/20 border-red-400/40 text-red-300' };
+    if (keyState === 'loading') return { text: '⏳ กำลังโหลด...',       cls: 'bg-white/10 border-white/20 text-white/60' };
+    if (keyState === 'empty')   return { text: '⚠️ ยังไม่มี API Key',  cls: 'bg-red-500/20 border-red-400/40 text-red-300' };
+    if (keyState === 'saving')  return { text: '⏳ กำลังบันทึก...',     cls: 'bg-white/10 border-white/20 text-white/60' };
+    if (keyState === 'saved')   return { text: '✓ บันทึกแล้ว!',          cls: 'bg-green-500/20 border-green-400/40 text-green-300' };
+    if (keyState === 'error')   return { text: '❌ Key ผิดพลาด',          cls: 'bg-red-500/20 border-red-400/40 text-red-300' };
     return keySource === 'supabase'
       ? { text: '✓ Key จาก Supabase', cls: 'bg-green-500/20 border-green-400/40 text-green-300' }
       : { text: '✓ Key จาก Local',    cls: 'bg-blue-500/20 border-blue-400/40 text-blue-300' };
@@ -329,11 +395,10 @@ export default function AIAssistant() {
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
               <h2 className="text-xl font-black text-white tracking-tight">จิงใจ AI ผู้ช่วยโรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">ดึงข้อมูลสดจากระบบทุกครั้งที่ถาม</p>
+              <p className="text-white/40 text-xs mt-0.5">เชื่อมต่อครบ 6 ตาราง • ดึงข้อมูลสดทุกครั้ง</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
-            {/* Model selector */}
             <div className="relative">
               <select value={model} onChange={e => setModel(e.target.value)}
                 className="bg-white/10 border border-white/20 text-white font-bold text-[11px] rounded-xl px-3 py-2 outline-none focus:border-[#DE9E48] appearance-none cursor-pointer pr-7">
@@ -343,7 +408,6 @@ export default function AIAssistant() {
               </select>
               <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
             </div>
-            {/* Key badge */}
             <button onClick={() => setShowKeyPanel(v => !v)}
               className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-[11px] font-bold transition-all ${keyBadge.cls}`}>
               {keySource === 'supabase' && keyState === 'ready' ? <Database size={12}/> : <Key size={12}/>}
@@ -362,11 +426,9 @@ export default function AIAssistant() {
             <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
               <Database size={14} className="text-[#DE9E48] mt-0.5 shrink-0" />
               <div>
-                <p className="text-white font-black text-xs">Key เก็บใน Supabase — ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
+                <p className="text-white font-black text-xs">Key เก็บใน Supabase (ตาราง app_settings) — ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
                 <p className="text-white/50 text-[11px] mt-1">
-                  ต้องสร้างตาราง <code className="bg-white/10 px-1 rounded">app_settings</code> ใน Supabase ก่อน<br/>
-                  SQL: <code className="bg-white/10 px-1 rounded text-white/60">CREATE TABLE app_settings (key text PRIMARY KEY, value text);</code><br/>
-                  ถ้าไม่มีตาราง จะบันทึกลงในเครื่องแทน (ใช้ได้เฉพาะเครื่องนั้น)
+                  ตาราง app_settings มีอยู่แล้วใน database ของคุณครับ ✓
                 </p>
               </div>
             </div>
@@ -461,7 +523,7 @@ export default function AIAssistant() {
           <input type="text" value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             disabled={!apiKey || loading}
-            placeholder={apiKey ? 'ถามได้เลย เช่น เบอร์ 081... คือของใคร? หรือ 15-20 เม.ย. มีเข้าพักกี่บ้าน?' : 'ใส่ API Key ก่อนครับ...'}
+            placeholder={apiKey ? 'ถามได้เลย เช่น เบอร์ 081... คือของใคร? หรือ มัดจำบ้านไหนยังไม่จ่าย?' : 'ใส่ API Key ก่อนครับ...'}
             className="flex-1 text-sm text-[#372C2E] placeholder:text-[#C4A99A] outline-none px-2 font-medium bg-transparent disabled:cursor-not-allowed"
           />
           <button onClick={() => sendMessage()} disabled={loading || !input.trim() || !apiKey}
@@ -470,7 +532,7 @@ export default function AIAssistant() {
           </button>
         </div>
         <p className="text-center text-[10px] text-[#C4A99A] mt-2 font-bold">
-          OpenRouter Free Models • ข้อมูลดึงสดจาก Supabase ทุกครั้งที่ถาม
+          เชื่อมต่อ: bookings · booking_ops · booking_playtime · customers · rooms · shop_products
         </p>
       </div>
     </div>
