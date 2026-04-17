@@ -7,9 +7,9 @@ import {
 
 // ── Models ────────────────────────────────────────────────────────────────
 const OPENROUTER_FREE_MODELS = [
+  { id: 'openai/gpt-oss-120b:free',               label: 'GPT OSS 120B แนะนำ' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
-  { id: 'openai/gpt-oss-120b:free',               label: 'GPT OSS 120B' },
-  { id: 'google/gemma-4-31b-it:free',             label: 'Gemma 4 31B' },
+  { id: 'google/gemma-4-31b-it:free',             label: 'Gemma 4 31B' },ห
   { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
   { id: 'qwen/qwen3-coder:free',                  label: 'Qwen Coder' },
   { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
@@ -145,7 +145,7 @@ async function saveKeyToSupabase(key) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วง 14-20 เมษา มีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nถามผมได้เลยครับ เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX-XXXX คือของใคร?\n• ช่วงเทศกาลมีเข้าพักกี่บ้าน?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -440,7 +440,7 @@ export default function AIAssistant() {
           </button>
         </div>
         <p className="text-center text-[10px] text-[#C4A99A] mt-2 font-bold">
-          OpenRouter Free Models • ข้อมูลดึงสดจาก Supabase ทุกครั้งที่ถาม
+          ทดสอบระบบAIผู้ช่วย
         </p>
       </div>
     </div>
