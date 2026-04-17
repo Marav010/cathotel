@@ -49,33 +49,50 @@ const [
   const enriched = (bookings || []).map(b => {
   const op = opsMap[b.id] || {};
   
-  // 1. ค้นหาข้อมูลจากตารางลูกค้า (Matching by customer_id)
-  const customer = (customers || []).find(c => c.id === b.customer_id) || {};
-  
-  // 2. ค้นหาข้อมูลเวลาเล่นของแมว (Matching by booking_id)
-  const playtime = (playtimes || []).filter(p => p.booking_id === b.id);
-  const playtimeStr = playtime.length > 0 
-    ? playtime.map(p => `${p.activity_name} (${p.play_time})`).join(', ')
-    : '-';
+ Const opsMap = {};
+  (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
 
-  const isCI = !!op.checked_in;
-  const isCO = !!op.checked_out;
+  const enriched = (bookings||[]).map(b => {
+    const op = opsMap[b.id] || {};
+    const isCI = !!op.checked_in;
+    const isCO = !!op.checked_out;
+    return {
+      บ้าน: b.room_type,
+      ชื่อลูกค้า: b.customer_name,
+      ชื่อแมว: b.cat_names,
+      เบอร์โทร: b.phone || '-',
+      วันเช็คอิน: b.start_date,
+      วันเช็คเอ้าท์: b.end_date,
+      ราคารวม: b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
+      หมายเหตุ: b.notes || '-',
+      สถานะ: isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
+      เวลาเช็คอิน: op.checkin_time || '-',
+      เวลาเช็คเอ้าท์: op.checkout_time || '-',
+    };
+  });
+
+  const staying      = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
+  const ciToday      = enriched.filter(b => b.วันเช็คอิน === today);
+  const coToday      = enriched.filter(b => b.วันเช็คเอ้าท์ === today);
+  const thisMonth    = today.slice(0, 7);
+  const monthRevenue = (bookings||[]).filter(b => b.start_date?.startsWith(thisMonth)).reduce((s, b) => s + (Number(b.total_price)||0), 0);
 
   return {
-    บ้าน: b.room_type,
-    ชื่อลูกค้า: b.customer_name || customer.full_name, // ใช้จากตารางจอง หรือ ตารางลูกค้า
-    ชื่อแมว: b.cat_names,
-    เบอร์โทร: b.phone || customer.phone || '-',
-    วันเช็คอิน: b.start_date,
-    วันเช็คเอ้าท์: b.end_date,
-    ราคารวม: b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
-    สถานะ: isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
-    // --- ข้อมูลเพิ่มเติมที่ดึงมาใหม่ ---
-    กิจกรรม: playtimeStr, 
-    ระดับสมาชิก: customer.membership_level || 'ทั่วไป',
-    หมายเหตุพิเศษ: b.notes || '-',
+    today,
+    todayTH: getTodayTH(),
+    summary: {
+      รายการจองทั้งหมด: enriched.length,
+      กำลังพักอยู่ตอนนี้: staying.length,
+      เช็คอินวันนี้: ciToday.length,
+      เช็คเอ้าท์วันนี้: coToday.length,
+      รายได้เดือนนี้: `${monthRevenue.toLocaleString()} บาท`,
+    },
+    กำลังพักอยู่ตอนนี้: staying,
+    เช็คอินวันนี้: ciToday,
+    เช็คเอ้าท์วันนี้: coToday,
+    การจองทั้งหมด: enriched,
   };
-});
+};
 
 // ── System Prompt ─────────────────────────────────────────────────────────
 const buildSystemPrompt = (data) => `คุณชื่อ "จริงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
