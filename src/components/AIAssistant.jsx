@@ -35,68 +35,86 @@ const fetchHotelData = async () => {
   const today = getTodayStr();
 
   const [
-  { data: bookings }, 
-  { data: ops }, 
-  { data: customers }, 
-  { data: rooms }, 
-  { data: playtimes }] = await Promise.all([
-  supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
-  supabase.from('booking_ops').select('*').limit(300),
-  supabase.from('customers').select('*').limit(300),
-  supabase.from('rooms').select('*').limit(300),
-  supabase.from('booking_playtime').select('*').limit(300),
-
+    { data: bookings },
+    { data: ops },
+    { data: customers },
+    { data: rooms },
+    { data: playtimes }
+  ] = await Promise.all([
+    supabase.from('bookings').select('*').order('start_date', { ascending: false }).limit(300),
+    supabase.from('booking_ops').select('*').limit(300),
+    supabase.from('customers').select('*').limit(300),
+    supabase.from('rooms').select('*').limit(300),
+    supabase.from('booking_playtime').select('*').limit(300),
   ]);
 
-  // สร้าง opsMap ก่อน
+  // ✅ map booking_ops
   const opsMap = {};
-  (ops || []).forEach(o => { opsMap[o.booking_id] = o; });
+  (ops || []).forEach(o => {
+    opsMap[o.booking_id] = o;
+  });
 
-  // แล้วค่อย map bookings
+  // ✅ map customers
+  const customerMap = {};
+  (customers || []).forEach(c => {
+    customerMap[c.id] = c;
+  });
+
+  // ✅ merge data
   const enriched = (bookings || []).map(b => {
-    const op  = opsMap[b.id] || {};
+    const op = opsMap[b.id] || {};
+    const customer = customerMap[b.customer_id] || {};
+
     const isCI = !!op.checked_in;
     const isCO = !!op.checked_out;
+
     return {
       บ้าน:          b.room_type,
-      ชื่อลูกค้า:    b.customer_name,
+      ชื่อลูกค้า:    customer.customer_name || b.customer_name || '-',
       ชื่อแมว:       b.cat_names,
-      เบอร์โทร:      b.phone || '-',
+      เบอร์โทร:      customer.phone || '-',
       วันเช็คอิน:    b.start_date,
       วันเช็คเอ้าท์: b.end_date,
-      ราคารวม:       b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
-      หมายเหตุ:      b.notes || '-',
-      สถานะ:         isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
-      เวลาเช็คอิน:   op.checkin_time  || '-',
+      ราคารวม:       b.total_price
+        ? `${Number(b.total_price).toLocaleString()} บาท`
+        : '-',
+      หมายเหตุ:      b.note || '-',
+      สถานะ:         isCO
+        ? 'เช็คเอ้าท์แล้ว'
+        : isCI
+        ? 'กำลังพักอยู่'
+        : 'ยังไม่เช็คอิน',
+      เวลาเช็คอิน:   op.checkin_time || '-',
       เวลาเช็คเอ้าท์: op.checkout_time || '-',
     };
   });
 
-  const staying      = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
-  const ciToday      = enriched.filter(b => b.วันเช็คอิน    === today);
-  const coToday      = enriched.filter(b => b.วันเช็คเอ้าท์ === today);
-  const thisMonth    = today.slice(0, 7);
+  const staying = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
+  const ciToday = enriched.filter(b => b.วันเช็คอิน === today);
+  const coToday = enriched.filter(b => b.วันเช็คเอ้าท์ === today);
+
+  const thisMonth = today.slice(0, 7);
+
   const monthRevenue = (bookings || [])
     .filter(b => b.start_date?.startsWith(thisMonth))
-    .reduce((s, b) => s + (Number(b.total_price) || 0), 0);
+    .reduce((sum, b) => sum + (Number(b.total_price) || 0), 0);
 
   return {
     today,
     todayTH: getTodayTH(),
     summary: {
-      รายการจองทั้งหมด:  enriched.length,
+      รายการจองทั้งหมด: enriched.length,
       กำลังพักอยู่ตอนนี้: staying.length,
-      เช็คอินวันนี้:      ciToday.length,
-      เช็คเอ้าท์วันนี้:  coToday.length,
-      รายได้เดือนนี้:    `${monthRevenue.toLocaleString()} บาท`,
+      เช็คอินวันนี้: ciToday.length,
+      เช็คเอ้าท์วันนี้: coToday.length,
+      รายได้เดือนนี้: `${monthRevenue.toLocaleString()} บาท`,
     },
     กำลังพักอยู่ตอนนี้: staying,
-    เช็คอินวันนี้:      ciToday,
-    เช็คเอ้าท์วันนี้:  coToday,
-    การจองทั้งหมด:     enriched,
+    เช็คอินวันนี้: ciToday,
+    เช็คเอ้าท์วันนี้: coToday,
+    การจองทั้งหมด: enriched,
   };
 };
-
 // ── System Prompt ─────────────────────────────────────────────────────────
 const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
 วันนี้: ${data.todayTH}
