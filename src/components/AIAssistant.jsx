@@ -9,7 +9,7 @@ import {
 const OPENROUTER_FREE_MODELS = [
   { id: 'openai/gpt-oss-120b:free',               label: 'GPT OSS 120B แนะนำ' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B' },
-  { id: 'google/gemma-4-31b-it:free',             label: 'Gemma 4 31B' },ห
+  { id: 'google/gemma-4-31b-it:free',             label: 'Gemma 4 31B' },
   { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B' },
   { id: 'qwen/qwen3-coder:free',                  label: 'Qwen Coder' },
   { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
