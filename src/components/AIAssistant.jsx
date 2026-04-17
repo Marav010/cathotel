@@ -49,27 +49,32 @@ const [
   const enriched = (bookings || []).map(b => {
   const op = opsMap[b.id] || {};
   
- Const opsMap = {};
-  (ops||[]).forEach(o => { opsMap[o.booking_id] = o; });
+ // สร้าง map ก่อน
+const opsMap = {};
+(ops || []).forEach(o => {
+  opsMap[o.booking_id] = o;
+});
 
-  const enriched = (bookings||[]).map(b => {
-    const op = opsMap[b.id] || {};
-    const isCI = !!op.checked_in;
-    const isCO = !!op.checked_out;
-    return {
-      บ้าน: b.room_type,
-      ชื่อลูกค้า: b.customer_name,
-      ชื่อแมว: b.cat_names,
-      เบอร์โทร: b.phone || '-',
-      วันเช็คอิน: b.start_date,
-      วันเช็คเอ้าท์: b.end_date,
-      ราคารวม: b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
-      หมายเหตุ: b.notes || '-',
-      สถานะ: isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
-      เวลาเช็คอิน: op.checkin_time || '-',
-      เวลาเช็คเอ้าท์: op.checkout_time || '-',
-    };
-  });
+// แล้วค่อย map bookings
+const enriched = (bookings || []).map(b => {
+  const op = opsMap[b.id] || {};
+  const isCI = !!op.checked_in;
+  const isCO = !!op.checked_out;
+
+  return {
+    บ้าน: b.room_type,
+    ชื่อลูกค้า: b.customer_name,
+    ชื่อแมว: b.cat_names,
+    เบอร์โทร: b.phone || '-',
+    วันเช็คอิน: b.start_date,
+    วันเช็คเอ้าท์: b.end_date,
+    ราคารวม: b.total_price ? `${Number(b.total_price).toLocaleString()} บาท` : '-',
+    หมายเหตุ: b.notes || '-',
+    สถานะ: isCO ? 'เช็คเอ้าท์แล้ว' : isCI ? 'กำลังพักอยู่' : 'ยังไม่เช็คอิน',
+    เวลาเช็คอิน: op.checkin_time || '-',
+    เวลาเช็คเอ้าท์: op.checkout_time || '-',
+  };
+});
 
   const staying      = enriched.filter(b => b.สถานะ === 'กำลังพักอยู่');
   const ciToday      = enriched.filter(b => b.วันเช็คอิน === today);
