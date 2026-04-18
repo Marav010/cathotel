@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Sparkles, Send, Loader2, RefreshCw, Bot, User,
-  Key, Eye, EyeOff, ChevronDown, CheckCircle2, Database,
+  Key, Eye, EyeOff, ChevronDown, CheckCircle2, Database, BarChart2, Settings2,
 } from 'lucide-react';
 
 // ── Models ────────────────────────────────────────────────────────────────
@@ -258,6 +258,51 @@ async function saveKeyToSupabase(key) {
   } catch { return false; }
 }
 
+
+// ── Quota (usage counter) stored in Supabase ─────────────────────────────
+const QUOTA_KEY    = 'ai_usage_count';
+const LIMIT_KEY    = 'ai_usage_limit';
+const DEFAULT_LIMIT = 100; // default monthly limit
+
+async function loadQuota() {
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('key,value')
+      .in('key', [QUOTA_KEY, LIMIT_KEY]);
+    const map = {};
+    (data||[]).forEach(r => { map[r.key] = r.value; });
+    return {
+      used:  parseInt(map[QUOTA_KEY]  || '0', 10),
+      limit: parseInt(map[LIMIT_KEY]  || String(DEFAULT_LIMIT), 10),
+    };
+  } catch { return { used: 0, limit: DEFAULT_LIMIT }; }
+}
+
+async function incrementQuota(current) {
+  try {
+    await supabase.from('app_settings')
+      .upsert({ key: QUOTA_KEY, value: String(current + 1) }, { onConflict: 'key' });
+    return current + 1;
+  } catch { return current + 1; }
+}
+
+async function setQuotaLimit(newLimit) {
+  try {
+    await supabase.from('app_settings')
+      .upsert({ key: LIMIT_KEY, value: String(newLimit) }, { onConflict: 'key' });
+    return true;
+  } catch { return false; }
+}
+
+async function resetQuota() {
+  try {
+    await supabase.from('app_settings')
+      .upsert({ key: QUOTA_KEY, value: '0' }, { onConflict: 'key' });
+    return true;
+  } catch { return false; }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
@@ -272,7 +317,20 @@ export default function AIAssistant() {
   const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [keyState, setKeyState] = useState('loading');
   const [keySource, setKeySource] = useState('');
+  const [quotaUsed, setQuotaUsed]   = useState(0);
+  const [quotaLimit, setQuotaLimit] = useState(DEFAULT_LIMIT);
+  const [showQuotaEdit, setShowQuotaEdit] = useState(false);
+  const [limitInput, setLimitInput] = useState('');
+  const [quotaLoading, setQuotaLoading]   = useState(false);
   const bottomRef               = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      // load quota
+      const q = await loadQuota();
+      setQuotaUsed(q.used); setQuotaLimit(q.limit); setLimitInput(String(q.limit));
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -357,6 +415,9 @@ export default function AIAssistant() {
       }
       const reply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      // increment quota
+      const newUsed = await incrementQuota(quotaUsed);
+      setQuotaUsed(newUsed);
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -394,8 +455,8 @@ export default function AIAssistant() {
             </div>
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
-              <h2 className="text-xl font-black text-white tracking-tight">จิงจิง AI ผู้ช่วยโรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">AI ผู้ช่วยโรงแรมแมว สอบถามได้ทุกอย่าง</p>
+              <h2 className="text-xl font-black text-white tracking-tight">จิงใจ AI ผู้ช่วยโรงแรมแมว</h2>
+              <p className="text-white/40 text-xs mt-0.5">เชื่อมต่อครบ 6 ตาราง • ดึงข้อมูลสดทุกครั้ง</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
@@ -426,9 +487,9 @@ export default function AIAssistant() {
             <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
               <Database size={14} className="text-[#DE9E48] mt-0.5 shrink-0" />
               <div>
-                <p className="text-white font-black text-xs">Key ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
+                <p className="text-white font-black text-xs">Key เก็บใน Supabase (ตาราง app_settings) — ใส่ครั้งเดียว ทุกเครื่องใช้ได้เลย</p>
                 <p className="text-white/50 text-[11px] mt-1">
-                 พร้อมใช้งาน✓
+                  ตาราง app_settings มีอยู่แล้วใน database ของคุณครับ ✓
                 </p>
               </div>
             </div>
@@ -456,7 +517,7 @@ export default function AIAssistant() {
             {keyState === 'ready' && apiKey && (
               <div className="flex items-center gap-2 text-green-300 text-[11px] font-bold">
                 <CheckCircle2 size={13}/>
-                <span>พร้อมใช้งาน {keySource === 'supabase' ? '(ทุกเครื่องใช้ได้)' : '(เก็บในเครื่องนี้เท่านั้น)'}</span>
+                <span>พร้อมใช้งาน {keySource === 'supabase' ? '(เก็บใน Supabase — ทุกเครื่องใช้ได้)' : '(เก็บในเครื่องนี้เท่านั้น)'}</span>
               </div>
             )}
           </div>
@@ -531,9 +592,84 @@ export default function AIAssistant() {
             {loading ? <Loader2 size={16} className="animate-spin"/> : <Send size={16}/>}
           </button>
         </div>
-        <p className="text-center text-[10px] text-[#C4A99A] mt-2 font-bold">
-          ทดสอบระบบAIผู้ช่วย
-        </p>
+        {/* ── Quota bar ── */}
+        <div className="mt-2 space-y-1.5">
+          {/* progress bar row */}
+          <div className="flex items-center gap-2">
+            <BarChart2 size={12} className="text-[#A1887F] shrink-0" />
+            <div className="flex-1 h-1.5 bg-[#F5F2F0] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  quotaUsed >= quotaLimit ? 'bg-red-400'
+                  : quotaUsed >= quotaLimit * 0.8 ? 'bg-amber-400'
+                  : 'bg-[#885E43]'
+                }`}
+                style={{ width: `${Math.min(100, quotaLimit > 0 ? (quotaUsed / quotaLimit) * 100 : 0)}%` }}
+              />
+            </div>
+            <span className={`text-[10px] font-black shrink-0 ${
+              quotaUsed >= quotaLimit ? 'text-red-500'
+              : quotaUsed >= quotaLimit * 0.8 ? 'text-amber-600'
+              : 'text-[#A1887F]'
+            }`}>
+              {quotaUsed}/{quotaLimit}
+            </span>
+            <button onClick={() => setShowQuotaEdit(v => !v)}
+              className="p-0.5 text-[#C4A99A] hover:text-[#885E43] transition-colors shrink-0" title="ตั้งค่าโควต้า">
+              <Settings2 size={11} />
+            </button>
+          </div>
+
+          {/* text row */}
+          <div className="flex items-center justify-between px-0.5">
+            <p className="text-[10px] text-[#C4A99A] font-bold">
+              ใช้ AI ไปแล้ว {quotaUsed} ครั้ง · เหลืออีก{' '}
+              <span className={quotaUsed >= quotaLimit ? 'text-red-500 font-black' : 'text-[#885E43] font-black'}>
+                {Math.max(0, quotaLimit - quotaUsed)} ครั้ง
+              </span>
+            </p>
+            {quotaUsed >= quotaLimit && (
+              <span className="text-[10px] font-black text-red-500 animate-pulse">⚠️ หมดโควต้า</span>
+            )}
+          </div>
+
+          {/* quota edit panel */}
+          {showQuotaEdit && (
+            <div className="bg-[#F5F2F0] border border-[#DBD0C5] rounded-2xl px-3 py-2.5 flex flex-col gap-2">
+              <p className="text-[10px] font-black text-[#372C2E]">⚙️ ตั้งค่าโควต้า (เก็บใน Supabase — ทุกเครื่องเห็นเหมือนกัน)</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#A1887F] font-bold whitespace-nowrap">จำกัด</span>
+                <input type="number" min="1" max="9999" value={limitInput}
+                  onChange={e => setLimitInput(e.target.value)}
+                  className="w-20 text-center text-xs font-black border border-[#DBD0C5] rounded-xl px-2 py-1.5 outline-none focus:border-[#885E43] bg-white text-[#372C2E]"
+                />
+                <span className="text-[10px] text-[#A1887F] font-bold">ครั้ง</span>
+                <button
+                  disabled={quotaLoading}
+                  onClick={async () => {
+                    setQuotaLoading(true);
+                    const n = parseInt(limitInput, 10);
+                    if (n > 0) { await setQuotaLimit(n); setQuotaLimit(n); }
+                    setQuotaLoading(false); setShowQuotaEdit(false);
+                  }}
+                  className="px-3 py-1.5 bg-[#885E43] text-white font-black text-[10px] rounded-xl hover:bg-[#6e4a34] transition-all disabled:opacity-50">
+                  {quotaLoading ? <Loader2 size={10} className="animate-spin"/> : 'บันทึก'}
+                </button>
+                <button
+                  disabled={quotaLoading}
+                  onClick={async () => {
+                    if (!window.confirm('รีเซ็ตตัวนับกลับเป็น 0?')) return;
+                    setQuotaLoading(true);
+                    await resetQuota(); setQuotaUsed(0);
+                    setQuotaLoading(false); setShowQuotaEdit(false);
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#DBD0C5] text-[#A1887F] font-black text-[10px] rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-300 transition-all disabled:opacity-50">
+                  รีเซ็ต
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
