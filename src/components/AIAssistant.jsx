@@ -9,8 +9,8 @@ import {
 // ── Models ────────────────────────────────────────────────────────────────
 const OPENROUTER_FREE_MODELS = [
   { id: 'openrouter/free',                           label: '🎲 Auto (เลือกอัตโนมัติ)' },
-  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B⭐' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B ⭐' },
+  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free',    label: 'Nemotron 120B' },
   { id: 'google/gemma-4-31b-it:free',                label: 'Gemma 4 31B' },
   { id: 'qwen/qwen3-coder:free',                     label: 'Qwen3 Coder' },
@@ -183,7 +183,7 @@ const fetchHotelData = async () => {
 };
 
 // ── System Prompt ─────────────────────────────────────────────────────────
-const buildSystemPrompt = (data) => `คุณชื่อ "จิงจิง AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
+const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
 วันนี้: ${data.todayTH}
 
 ━━━ ภาพรวมโรงแรมวันนี้ ━━━
@@ -235,18 +235,18 @@ FORMAT:
 - ห้ามใช้ * ** _ __ ~~  หรือ Markdown syntax ใดๆ ทั้งสิ้น เด็ดขาด
 - ห้ามใช้ # ## ### หรือ heading ใดๆ
 - ถ้าอยากเน้น ใช้ตัวอักษรปกติหรือ emoji แทน
-- แต่ละรายการขึ้นบรรทัดใหม่ ใช้ emoji นำหน้าแทน bullet
+- แต่ละรายการขึ้นบรรทัดใหม่ ใช้ "→" หรือ emoji นำหน้าแทน bullet
 - ถ้ามีหลายรายการ จัดเป็นบรรทัดสวยๆ อ่านง่าย เว้นบรรทัดระหว่างหัวข้อ
 
 CONTENT:
 - ตอบภาษาไทยเท่านั้น ห้ามมีภาษาอังกฤษนอกจากชื่อเฉพาะ
 - ตอบเหมือนพนักงานโรงแรมมืออาชีพ สุภาพ อบอุ่น กระชับ
 - ห้ามแสดง JSON, โค้ด, หรือข้อมูลทางเทคนิค
-- ถ้าถามเบอร์/ชื่อ ตอบทันทีว่าเป็นของใคร อยู่บ้านไหน
-- ถ้าถามช่วงวันที่ นับจากข้อมูลทั้งหมด ตอบจำนวนและรายชื่อ
-- ถ้าถามรายได้ คำนวณและแสดงตัวเลขชัดเจน
-- ถ้าถามว่าห้องว่างไหม ดูจากการจองที่ทับซ้อนในช่วงนั้น
-- ถ้าถามมัดจำ ดูจาก "วางมัดจำแล้ว" ของแต่ละบ้าน
+- ถ้าถามเบอร์/ชื่อ → ตอบทันทีว่าเป็นของใคร อยู่บ้านไหน
+- ถ้าถามช่วงวันที่ → นับจากข้อมูลทั้งหมด ตอบจำนวนและรายชื่อ
+- ถ้าถามรายได้ → คำนวณและแสดงตัวเลขชัดเจน
+- ถ้าถามว่าห้องว่างไหม → ดูจากการจองที่ทับซ้อนในช่วงนั้น
+- ถ้าถามมัดจำ → ดูจาก "วางมัดจำแล้ว" ของแต่ละบ้าน
 - ตอบให้ครบทุกรายการ ห้ามตัดข้อมูล
 - ห้ามบอกว่า "ไม่มีข้อมูล" ถ้าข้อมูลอยู่ในระบบ
 
@@ -254,7 +254,7 @@ CONTENT:
 🏠 บ้านวีไอพี — คุณสมชาย ใจดี
 🐱 แมว: มีมี่, โดโด้
 📱 เบอร์: 081-234-5678
-📅 เช็คอิน: 18 เม.ย. และ เช็คเอ้าท์: 22 เม.ย.
+📅 เช็คอิน: 18 เม.ย. → เช็คเอ้าท์: 22 เม.ย.
 💰 ราคา: 4,800 บาท | มัดจำ: วางแล้ว`;
 
 // ── Supabase key storage ──────────────────────────────────────────────────
@@ -361,7 +361,7 @@ async function saveFeedback(type, question, answer) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงจิง AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -472,8 +472,9 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
           headers: {
             'Content-Type':  'application/json',
             'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer':  window.location.origin,
+            'HTTP-Referer':  window.location.href,
             'X-Title':       'Jingjai Cat Hotel AI',
+            'Origin':        window.location.origin,
           },
           body: JSON.stringify({
             model: modelId,
@@ -483,36 +484,41 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
               { role: 'user', content: msg },
             ],
             max_tokens:  2000,
-            temperature: 0.1,
+            temperature: 0.15,
           }),
         });
         return res.json();
       };
 
-      // try selected model first, then fallback to openrouter/free
+      // try selected model first
       let json = await callModel(model);
+      let usedModel = model;
 
-      // if provider error → auto-retry with openrouter/free (auto-router)
+      // auto-retry with openrouter/free if current model fails for any reason
       if (json.error && model !== 'openrouter/free') {
-        const em = json.error.message || '';
-        const isProviderErr = em.toLowerCase().includes('provider') ||
-          em.includes('503') || em.includes('502') || em.includes('500') ||
-          em.toLowerCase().includes('unavailable') || em.toLowerCase().includes('overload');
-        if (isProviderErr) {
-          // silent retry
-          json = await callModel('openrouter/free');
-        }
+        json = await callModel('openrouter/free');
+        usedModel = 'openrouter/free';
       }
 
       if (json.error) {
-        const em = json.error.message || '';
-        if (em.includes('rate limit') || em.includes('quota') || em.includes('429'))
-          throw new Error('เกินโควต้าต่อวัน (200 ครั้ง) กรุณาลองพรุ่งนี้ หรือเปลี่ยนโมเดลครับ');
-        if (em.includes('401') || em.toLowerCase().includes('key') || em.toLowerCase().includes('auth')) {
-          setKeyState('error');
-          throw new Error('API Key ไม่ถูกต้อง กรุณาตรวจสอบและบันทึก Key ใหม่ครับ');
+        const em  = json.error.message || JSON.stringify(json.error);
+        const code2 = json.error.code || json.error.status || '';
+        // show real error so user knows what's happening
+        if (em.toLowerCase().includes('allowlist') || em.toLowerCase().includes('not allowed') || String(code2) === '403') {
+          throw new Error(`Domain ไม่ได้รับอนุญาต\nAPI Key นี้ถูกจำกัดให้ใช้ได้เฉพาะบาง domain\nกรุณาเข้า openrouter.ai → API Keys → ลบ Domain Restriction ออกครับ`);
         }
-        throw new Error('โมเดลไม่พร้อมใช้งาน ลองเปลี่ยนเป็น "Auto" แล้วถามใหม่ครับ');
+        if (String(code2) === '401' || em.includes('401') || em.toLowerCase().includes('invalid api key') || em.toLowerCase().includes('no auth')) {
+          setKeyState('error');
+          throw new Error(`API Key ไม่ถูกต้องหรือหมดอายุครับ\nกรุณากดปุ่ม Key แล้วใส่ Key ใหม่\n\n(Error: ${em})`);
+        }
+        if (String(code2) === '429' || em.includes('429') || em.includes('rate limit') || em.includes('quota')) {
+          throw new Error(`ใช้งานเกินโควต้าต่อวัน (200 ครั้ง/วัน)\nกรุณาลองพรุ่งนี้ หรือสมัคร OpenRouter แบบมีเครดิตครับ`);
+        }
+        if (em.includes('402') || em.toLowerCase().includes('insufficient')) {
+          throw new Error(`เครดิต OpenRouter หมดแล้วครับ กรุณาเติมเครดิตที่ openrouter.ai`);
+        }
+        // generic — show actual error
+        throw new Error(`เกิดข้อผิดพลาดครับ:\n${em}`);
       }
       const rawReply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
       // strip markdown formatting that some models add despite instructions
@@ -531,7 +537,7 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `❌ ${err.message}\n\nลองเปลี่ยนโมเดลหรือตรวจสอบ API Key ครับ`,
+        content: `❌ ${err.message}`,
       }]);
     }
     setLoading(false);
@@ -565,8 +571,8 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
             </div>
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
-              <h2 className="text-xl font-black text-white tracking-tight">จิงจิง AI ผู้ช่วยโรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">สอบถามรายละเอียดเกี่ยวกับโรงแรมแมว</p>
+              <h2 className="text-xl font-black text-white tracking-tight">จิงใจ AI ผู้ช่วยโรงแรมแมว</h2>
+              <p className="text-white/40 text-xs mt-0.5">เชื่อมต่อครบ 6 ตาราง • ดึงข้อมูลสดทุกครั้ง</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
