@@ -7,12 +7,15 @@ import {
 
 // ── Models ────────────────────────────────────────────────────────────────
 const OPENROUTER_FREE_MODELS = [
-  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B ⭐ แนะนำ' },
+  { id: 'openrouter/free',                           label: '🎲 Auto (เลือกอัตโนมัติ)' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B ⭐' },
+  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free',    label: 'Nemotron 120B' },
   { id: 'google/gemma-4-31b-it:free',                label: 'Gemma 4 31B' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B' },
-  { id: 'qwen/qwen3-coder:free',                     label: 'Qwen Coder' },
+  { id: 'qwen/qwen3-coder:free',                     label: 'Qwen3 Coder' },
   { id: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 405B' },
+  { id: 'google/gemma-3-27b-it:free',                label: 'Gemma 3 27B' },
+  { id: 'minimax/minimax-m2.5:free',                 label: 'MiniMax M2.5' },
 ];
 
 const QUICK_QUESTIONS = [
@@ -396,36 +399,54 @@ export default function AIAssistant() {
       const data    = await fetchHotelData();
       const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer':  window.location.origin,
-          'X-Title':       'Jingjai Cat Hotel AI',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: buildSystemPrompt(data) },
-            ...history,
-            { role: 'user', content: msg },
-          ],
-          max_tokens:  2000,
-          temperature: 0.15,
-        }),
-      });
+      // helper: call one model
+      const callModel = async (modelId) => {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer':  window.location.origin,
+            'X-Title':       'Jingjai Cat Hotel AI',
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [
+              { role: 'system', content: buildSystemPrompt(data) },
+              ...history,
+              { role: 'user', content: msg },
+            ],
+            max_tokens:  2000,
+            temperature: 0.15,
+          }),
+        });
+        return res.json();
+      };
 
-      const json = await res.json();
+      // try selected model first, then fallback to openrouter/free
+      let json = await callModel(model);
+
+      // if provider error → auto-retry with openrouter/free (auto-router)
+      if (json.error && model !== 'openrouter/free') {
+        const em = json.error.message || '';
+        const isProviderErr = em.toLowerCase().includes('provider') ||
+          em.includes('503') || em.includes('502') || em.includes('500') ||
+          em.toLowerCase().includes('unavailable') || em.toLowerCase().includes('overload');
+        if (isProviderErr) {
+          // silent retry
+          json = await callModel('openrouter/free');
+        }
+      }
+
       if (json.error) {
         const em = json.error.message || '';
         if (em.includes('rate limit') || em.includes('quota') || em.includes('429'))
-          throw new Error('โมเดลนี้ใช้งานเยอะเกินไป กรุณาเปลี่ยนโมเดลแล้วลองใหม่ครับ');
-        if (em.includes('401') || em.includes('key') || em.includes('auth')) {
+          throw new Error('เกินโควต้าต่อวัน (200 ครั้ง) กรุณาลองพรุ่งนี้ หรือเปลี่ยนโมเดลครับ');
+        if (em.includes('401') || em.toLowerCase().includes('key') || em.toLowerCase().includes('auth')) {
           setKeyState('error');
           throw new Error('API Key ไม่ถูกต้อง กรุณาตรวจสอบและบันทึก Key ใหม่ครับ');
         }
-        throw new Error(em || 'เกิดข้อผิดพลาดจาก API');
+        throw new Error('โมเดลไม่พร้อมใช้งาน ลองเปลี่ยนเป็น "Auto" แล้วถามใหม่ครับ');
       }
       const rawReply = json.choices?.[0]?.message?.content || 'ไม่ได้รับคำตอบ';
       // strip markdown formatting that some models add despite instructions
