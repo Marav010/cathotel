@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   Sparkles, Send, Loader2, RefreshCw, Bot, User,
   Key, Eye, EyeOff, ChevronDown, CheckCircle2, Database, BarChart2, Settings2,
+  ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 
 // ── Models ────────────────────────────────────────────────────────────────
@@ -320,6 +321,42 @@ async function resetQuota() {
   } catch { return false; }
 }
 
+// ── Feedback / reward system ──────────────────────────────────────────────
+// เก็บ feedback ไว้ใน app_settings key = 'ai_good_examples' และ 'ai_bad_examples'
+// เป็น JSON array ของ { q, a } สูงสุด 10 คู่ล่าสุด
+
+async function loadFeedback() {
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('key,value')
+      .in('key', ['ai_good_examples', 'ai_bad_examples']);
+    const map = {};
+    (data||[]).forEach(r => { map[r.key] = r.value; });
+    return {
+      good: JSON.parse(map['ai_good_examples'] || '[]'),
+      bad:  JSON.parse(map['ai_bad_examples']  || '[]'),
+    };
+  } catch { return { good: [], bad: [] }; }
+}
+
+async function saveFeedback(type, question, answer) {
+  // type = 'good' | 'bad'
+  const key = type === 'good' ? 'ai_good_examples' : 'ai_bad_examples';
+  try {
+    const { data } = await supabase
+      .from('app_settings').select('value').eq('key', key).single();
+    let list = [];
+    try { list = JSON.parse(data?.value || '[]'); } catch {}
+    // keep max 8 examples
+    list = [{ q: question.slice(0, 200), a: answer.slice(0, 400) }, ...list].slice(0, 8);
+    await supabase.from('app_settings')
+      .upsert({ key, value: JSON.stringify(list) }, { onConflict: 'key' });
+    return true;
+  } catch { return false; }
+}
+
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
@@ -339,6 +376,9 @@ export default function AIAssistant() {
   const [showQuotaEdit, setShowQuotaEdit] = useState(false);
   const [limitInput, setLimitInput] = useState('');
   const [quotaLoading, setQuotaLoading]   = useState(false);
+  const [feedbacks, setFeedbacks]         = useState({}); // msgIndex → 'good'|'bad'
+  const [goodExamples, setGoodExamples]   = useState([]);
+  const [badExamples, setBadExamples]     = useState([]);
   const bottomRef               = useRef(null);
 
   useEffect(() => {
@@ -346,6 +386,9 @@ export default function AIAssistant() {
       // load quota
       const q = await loadQuota();
       setQuotaUsed(q.used); setQuotaLimit(q.limit); setLimitInput(String(q.limit));
+      // load feedback examples
+      const fb = await loadFeedback();
+      setGoodExamples(fb.good); setBadExamples(fb.bad);
     })();
   }, []);
 
@@ -387,17 +430,40 @@ export default function AIAssistant() {
     }
   };
 
+  const handleFeedback = async (msgIndex, type, question, answer) => {
+    // prevent double-click
+    if (feedbacks[msgIndex]) return;
+    setFeedbacks(prev => ({ ...prev, [msgIndex]: type }));
+    await saveFeedback(type, question, answer);
+    // reload examples
+    const fb = await loadFeedback();
+    setGoodExamples(fb.good); setBadExamples(fb.bad);
+  };
+
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
     if (!msg || loading) return;
     if (!apiKey) { setShowKeyPanel(true); return; }
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg }]);
+    const userMsgIndex = messages.length + 1; // index of upcoming assistant reply
+    setMessages(prev => [...prev, { role: 'user', content: msg, _q: msg }]);
     setLoading(true);
 
     try {
       const data    = await fetchHotelData();
       const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+      // build feedback context from saved examples
+      const fbGood = goodExamples.slice(0, 5);
+      const fbBad  = badExamples.slice(0, 3);
+      const feedbackSection = (fbGood.length || fbBad.length) ? `
+
+━━━ ตัวอย่างคำตอบที่ดี (ผู้ใช้กด 👍) ━━━
+${fbGood.map((e,i) => `ถาม: ${e.q}\nตอบ: ${e.a}`).join('\n---\n') || 'ยังไม่มี'}
+
+━━━ รูปแบบที่ควรหลีกเลี่ยง (ผู้ใช้กด 👎) ━━━
+${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ดี: ${e.a.slice(0,150)}...`).join('\n---\n') || 'ยังไม่มี'}
+
+ให้เรียนรู้จากตัวอย่างข้างบน และตอบในสไตล์เดียวกับที่ผู้ใช้ชอบ` : '';
 
       // helper: call one model
       const callModel = async (modelId) => {
@@ -412,7 +478,7 @@ export default function AIAssistant() {
           body: JSON.stringify({
             model: modelId,
             messages: [
-              { role: 'system', content: buildSystemPrompt(data) },
+              { role: 'system', content: buildSystemPrompt(data) + feedbackSection },
               ...history,
               { role: 'user', content: msg },
             ],
@@ -458,7 +524,7 @@ export default function AIAssistant() {
         .replace(/__(.+?)__/g, '$1')            // __underline__ → plain
         .replace(/~~(.+?)~~/g, '$1')            // ~~strike~~ → plain
         .trim();
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply, _q: msg, _idx: Date.now() }]);
       // increment quota
       const newUsed = await incrementQuota(quotaUsed);
       setQuotaUsed(newUsed);
@@ -587,12 +653,42 @@ export default function AIAssistant() {
                 <Bot size={14} className="text-[#DE9E48]"/>
               </div>
             )}
-            <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-              msg.role === 'user'
-                ? 'bg-[#885E43] text-white rounded-tr-sm font-medium'
-                : 'bg-white border border-[#efebe9] text-[#372C2E] rounded-tl-sm shadow-sm'
-            }`}>
-              {msg.content}
+            <div className="flex flex-col gap-1 max-w-[82%]">
+              <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                msg.role === 'user'
+                  ? 'bg-[#885E43] text-white rounded-tr-sm font-medium'
+                  : 'bg-white border border-[#efebe9] text-[#372C2E] rounded-tl-sm shadow-sm'
+              }`}>
+                {msg.content}
+              </div>
+              {/* Feedback buttons — only for non-first assistant messages */}
+              {msg.role === 'assistant' && i > 0 && msg._q && (
+                <div className="flex items-center gap-1.5 px-1">
+                  {feedbacks[i] ? (
+                    <span className="text-[10px] font-bold text-[#A1887F] flex items-center gap-1">
+                      {feedbacks[i] === 'good'
+                        ? <><ThumbsUp size={11} className="text-green-500"/> ขอบคุณ! AI จะจำไว้ 🐱</>
+                        : <><ThumbsDown size={11} className="text-red-400"/> รับทราบ จะปรับปรุงครับ</>}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-[#C4A99A] font-bold">คำตอบนี้ดีไหม?</span>
+                      <button
+                        onClick={() => handleFeedback(i, 'good', msg._q, msg.content)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black bg-white border border-[#efebe9] text-[#A1887F] hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-all"
+                        title="ดี! ให้ AI เรียนรู้แบบนี้">
+                        <ThumbsUp size={11}/> ดี
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(i, 'bad', msg._q, msg.content)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black bg-white border border-[#efebe9] text-[#A1887F] hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all"
+                        title="ไม่ดี ให้ AI หลีกเลี่ยง">
+                        <ThumbsDown size={11}/> ปรับปรุง
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-8 h-8 rounded-xl bg-[#DE9E48] flex items-center justify-center shrink-0 mt-1">
