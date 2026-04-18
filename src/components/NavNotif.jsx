@@ -161,7 +161,15 @@ export default function NavNotif() {
     setLoading(false);
   }, []);
 
-  // fetch when opened
+  // fetch on mount immediately (so badge shows without opening dropdown)
+  // then refresh every 5 minutes automatically
+  useEffect(() => {
+    fetchData(); // fetch right away
+    const interval = setInterval(fetchData, 5 * 60 * 1000); // every 5 min
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // also refresh when dropdown is opened (get latest)
   useEffect(() => { if (open) fetchData(); }, [open, fetchData]);
 
   const showToast = (type, msg) => {
