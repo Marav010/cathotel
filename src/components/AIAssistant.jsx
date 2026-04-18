@@ -483,7 +483,7 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
               { role: 'user', content: msg },
             ],
             max_tokens:  2000,
-            temperature: 0.15,
+            temperature: 0.1,
           }),
         });
         return res.json();
