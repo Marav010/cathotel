@@ -9,8 +9,8 @@ import {
 // ── Models ────────────────────────────────────────────────────────────────
 const OPENROUTER_FREE_MODELS = [
   { id: 'openrouter/free',                           label: '🎲 Auto (เลือกอัตโนมัติ)' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B ⭐' },
-  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B' },
+  { id: 'openai/gpt-oss-120b:free',                  label: 'GPT OSS 120B⭐' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',    label: 'Llama 3.3 70B' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free',    label: 'Nemotron 120B' },
   { id: 'google/gemma-4-31b-it:free',                label: 'Gemma 4 31B' },
   { id: 'qwen/qwen3-coder:free',                     label: 'Qwen3 Coder' },
@@ -183,7 +183,7 @@ const fetchHotelData = async () => {
 };
 
 // ── System Prompt ─────────────────────────────────────────────────────────
-const buildSystemPrompt = (data) => `คุณชื่อ "จิงใจ AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
+const buildSystemPrompt = (data) => `คุณชื่อ "จิงจิง AI" เป็นผู้ช่วยของ "โรงแรมแมวจริงใจ" (Jingjai Cat Hotel)
 วันนี้: ${data.todayTH}
 
 ━━━ ภาพรวมโรงแรมวันนี้ ━━━
@@ -235,7 +235,7 @@ FORMAT:
 - ห้ามใช้ * ** _ __ ~~  หรือ Markdown syntax ใดๆ ทั้งสิ้น เด็ดขาด
 - ห้ามใช้ # ## ### หรือ heading ใดๆ
 - ถ้าอยากเน้น ใช้ตัวอักษรปกติหรือ emoji แทน
-- แต่ละรายการขึ้นบรรทัดใหม่ ใช้ "→" หรือ emoji นำหน้าแทน bullet
+- แต่ละรายการขึ้นบรรทัดใหม่ ใช้ emoji นำหน้าแทน bullet
 - ถ้ามีหลายรายการ จัดเป็นบรรทัดสวยๆ อ่านง่าย เว้นบรรทัดระหว่างหัวข้อ
 
 CONTENT:
@@ -254,7 +254,7 @@ CONTENT:
 🏠 บ้านวีไอพี — คุณสมชาย ใจดี
 🐱 แมว: มีมี่, โดโด้
 📱 เบอร์: 081-234-5678
-📅 เช็คอิน: 18 เม.ย. → เช็คเอ้าท์: 22 เม.ย.
+📅 เช็คอิน: 18 เม.ย. และ เช็คเอ้าท์: 22 เม.ย.
 💰 ราคา: 4,800 บาท | มัดจำ: วางแล้ว`;
 
 // ── Supabase key storage ──────────────────────────────────────────────────
@@ -361,7 +361,7 @@ async function saveFeedback(type, question, answer) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงใจ AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงจิง AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -565,8 +565,8 @@ ${fbBad.map((e,i) => `ถาม: ${e.q}\nตอบแบบนี้ไม่ด
             </div>
             <div>
               <p className="text-[#DE9E48] text-[10px] font-black uppercase tracking-[0.25em] mb-0.5">Admin · AI Assistant</p>
-              <h2 className="text-xl font-black text-white tracking-tight">จิงใจ AI ผู้ช่วยโรงแรมแมว</h2>
-              <p className="text-white/40 text-xs mt-0.5">เชื่อมต่อครบ 6 ตาราง • ดึงข้อมูลสดทุกครั้ง</p>
+              <h2 className="text-xl font-black text-white tracking-tight">จิงจิง AI ผู้ช่วยโรงแรมแมว</h2>
+              <p className="text-white/40 text-xs mt-0.5">สอบถามรายละเอียดเกี่ยวกับโรงแรมแมว</p>
             </div>
           </div>
           <div className="md:ml-auto flex items-center gap-2 shrink-0 flex-wrap">
