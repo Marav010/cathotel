@@ -31,7 +31,8 @@ export default function HistoryTable() {
 
   const [editForm, setEditForm] = useState({
     customer_name: '', cat_names: '', room_type: '', note: '',
-    start_date: '', end_date: '', deposit: 0, extra_items: []
+    start_date: '', end_date: '', deposit: 0, extra_items: [],
+    paid_on_checkin: 0,
   });
 
   const formatDateDisplay = (dateStr) => {
@@ -66,7 +67,8 @@ export default function HistoryTable() {
       start_date: booking.start_date || '',
       end_date: booking.end_date || '',
       deposit: booking.deposit || 0,
-      extra_items: []
+      extra_items: [],
+      paid_on_checkin: booking.paid_on_checkin || 0,
     });
   };
 
@@ -104,7 +106,8 @@ export default function HistoryTable() {
       customer_name: editForm.customer_name, cat_names: editForm.cat_names,
       room_type: editForm.room_type, note: finalNote,
       start_date: editForm.start_date, end_date: editForm.end_date,
-      total_price: newTotalPrice, deposit: editForm.deposit
+      total_price: newTotalPrice, deposit: editForm.deposit,
+      paid_on_checkin: editForm.paid_on_checkin || 0,
     }).eq('id', id);
     if (error) showAlert('error', 'บันทึกไม่สำเร็จ', error.message);
     else { setEditingId(null); fetchBookings(); showAlert('success', 'บันทึกเรียบร้อย', 'แก้ไขข้อมูลเรียบร้อยแล้ว ✨'); }
@@ -229,7 +232,7 @@ export default function HistoryTable() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-[#f0ece8]">
-                  {['ลูกค้า / น้องแมว', 'ห้องพัก', 'การเงิน / หมายเหตุ', 'ช่วงเข้าพัก', 'จัดการ'].map(h => (
+                  {['ลูกค้า / น้องแมว', 'ห้องพัก', 'การเงิน & ชำระเงิน', 'ช่วงเข้าพัก', 'จัดการ'].map(h => (
                     <th key={h} className="px-5 py-4 text-[10px] font-black text-[#A1887F] uppercase tracking-[0.15em] bg-[#FDFBFA] whitespace-nowrap">
                       {h}
                     </th>
@@ -248,7 +251,8 @@ export default function HistoryTable() {
                 ) : currentItems.map((b, rowIdx) => {
                   const isEditing = editingId === b.id;
                   const roomCfg = ROOM_CONFIG[b.room_type] || {};
-                  const remaining = Math.max(0, (b.total_price || 0) - (b.deposit || 0));
+                  const totalPaid  = (b.deposit || 0) + (b.paid_on_checkin || 0);
+                  const remaining  = Math.max(0, (b.total_price || 0) - totalPaid);
 
                   return (
                     <tr key={b.id} className="row-in border-b border-[#f5f0ec] transition-colors" style={{ animationDelay: `${rowIdx * 30}ms` }}>
@@ -303,6 +307,14 @@ export default function HistoryTable() {
                                 onChange={e => setEditForm(p => ({ ...p, deposit: parseFloat(e.target.value) || 0 }))} />
                             </div>
 
+                            {/* Paid on check-in */}
+                            <div className="flex items-center gap-2">
+                              <label className="text-[10px] font-black text-[#368daf] uppercase tracking-wider whitespace-nowrap">ชำระวันเข้าพัก</label>
+                              <input type="number" className="ht-input flex-1"
+                                value={editForm.paid_on_checkin}
+                                onChange={e => setEditForm(p => ({ ...p, paid_on_checkin: parseFloat(e.target.value) || 0 }))} />
+                            </div>
+
                             {/* Extra items */}
                             <div className="border-t border-[#efebe9] pt-2 space-y-1.5">
                               <div className="flex items-center justify-between">
@@ -336,25 +348,44 @@ export default function HistoryTable() {
                           </div>
                         ) : (
                           <div className="space-y-1.5">
-                            {/* Deposit badge */}
-                            {b.deposit > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-black">
-                                <BadgeCheck size={11} /><span className="f-number" style={{ fontSize: "0.8rem" }}>฿{b.deposit.toLocaleString()}</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg text-[10px] font-black">
-                                ยังไม่มัดจำ
-                              </span>
-                            )}
+                            {/* Row 1: total price */}
+                            <span className="f-number px-2 py-0.5 bg-[#372C2E] text-white rounded-md inline-block" style={{ fontSize: "0.85rem" }}>
+                              รวม ฿{(b.total_price || 0).toLocaleString()}
+                            </span>
 
-                            {/* Total & remaining */}
+                            {/* Row 2: deposit + paid_on_checkin badges */}
                             <div className="flex flex-wrap gap-1">
-                              <span className="f-number px-2 py-0.5 bg-[#372C2E] text-white rounded-md" style={{ fontSize: "0.85rem" }}>
-                                ฿{(b.total_price || 0).toLocaleString()}
-                              </span>
-                              <span className="f-number px-2 py-0.5 bg-[#885E43] text-white rounded-md" style={{ fontSize: "0.85rem" }}>
-                                คงเหลือ ฿{remaining.toLocaleString()}
-                              </span>
+                              {b.deposit > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-black">
+                                  <BadgeCheck size={10} />มัดจำ ฿{b.deposit.toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg text-[10px] font-black">
+                                  ยังไม่มัดจำ
+                                </span>
+                              )}
+                              {b.paid_on_checkin > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[10px] font-black">
+                                  <Wallet size={10} />วันเข้าพัก ฿{b.paid_on_checkin.toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-lg text-[10px] font-black">
+                                  ยังไม่ชำระวันเข้าพัก
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Row 3: remaining */}
+                            <div>
+                              {remaining > 0 ? (
+                                <span className="f-number px-2 py-0.5 bg-rose-500 text-white rounded-md inline-block" style={{ fontSize: "0.85rem" }}>
+                                  ค้างชำระ ฿{remaining.toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[10px] font-black">
+                                  <BadgeCheck size={10} /> ชำระครบแล้ว ✓
+                                </span>
+                              )}
                             </div>
 
                             {/* Note */}
