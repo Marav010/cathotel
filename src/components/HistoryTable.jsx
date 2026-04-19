@@ -26,8 +26,8 @@ export default function HistoryTable() {
   const [sortOrder, setSortOrder]     = useState('newest');
   const [deleteTarget, setDeleteTarget]   = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, type: 'success', title: '', message: '' });
-  const itemsPerPage = 10;
 
   const [editForm, setEditForm] = useState({
     customer_name: '', cat_names: '', room_type: '', note: '',
@@ -42,7 +42,7 @@ export default function HistoryTable() {
   };
 
   const fetchBookings = async () => {
-    const { data } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('bookings').select('*').order('created_at', { ascending: false }).limit(2000);
     setBookings(data || []);
   };
 
@@ -133,6 +133,7 @@ export default function HistoryTable() {
   const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages   = Math.ceil(filtered.length / itemsPerPage);
   const paginate = (p) => setCurrentPage(p);
+  const changePerPage = (n) => { setItemsPerPage(n); setCurrentPage(1); };
 
   return (
     <>
@@ -453,33 +454,69 @@ export default function HistoryTable() {
           </div>
 
           {/* ── Pagination ── */}
-          {filtered.length > 0 && (
-            <div className="px-5 py-4 bg-[#FDFBFA] border-t border-[#efebe9] flex flex-col md:flex-row items-center justify-between gap-3">
-              <p className="text-[11px] font-bold text-[#A1887F] uppercase tracking-wider">
-                แสดง {indexOfFirstItem + 1}–{Math.min(indexOfLastItem, filtered.length)} จาก {filtered.length} รายการ
-              </p>
-              <div className="flex items-center gap-1">
-                <button onClick={() => paginate(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
-                  className="w-9 h-9 rounded-xl hover:bg-white border border-transparent hover:border-[#efebe9] disabled:opacity-30 text-[#885E43] flex items-center justify-center transition-all">
-                  <ChevronLeft size={16} />
-                </button>
-                {[...Array(totalPages)].map((_, i) => (
-                  <button key={i + 1} onClick={() => paginate(i + 1)}
-                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${
-                      currentPage === i + 1
-                        ? 'bg-[#372C2E] text-[#DE9E48] shadow-md'
-                        : 'text-[#A1887F] hover:bg-white hover:border hover:border-[#efebe9]'
-                    }`}>
-                    {i + 1}
+          {filtered.length > 0 && (() => {
+            // smart page buttons: show max 7 buttons with ellipsis
+            const getPages = () => {
+              if (totalPages <= 7) return [...Array(totalPages)].map((_, i) => i + 1);
+              const pages = [];
+              if (currentPage <= 4) {
+                pages.push(1,2,3,4,5,'…',totalPages);
+              } else if (currentPage >= totalPages - 3) {
+                pages.push(1,'…',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages);
+              } else {
+                pages.push(1,'…',currentPage-1,currentPage,currentPage+1,'…',totalPages);
+              }
+              return pages;
+            };
+            return (
+              <div className="px-5 py-4 bg-[#FDFBFA] border-t border-[#efebe9] flex flex-col md:flex-row items-center justify-between gap-3 flex-wrap">
+                {/* Left: info + per-page selector */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-[11px] font-bold text-[#A1887F] uppercase tracking-wider">
+                    แสดง {indexOfFirstItem + 1}–{Math.min(indexOfLastItem, filtered.length)} จาก {filtered.length} รายการ
+                  </p>
+                  {/* Per-page selector */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-[#C4A99A]">หน้าละ</span>
+                    {[10, 20, 50, 100].map(n => (
+                      <button key={n} onClick={() => changePerPage(n)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
+                          itemsPerPage === n
+                            ? 'bg-[#885E43] text-white'
+                            : 'bg-white border border-[#efebe9] text-[#A1887F] hover:border-[#885E43] hover:text-[#885E43]'
+                        }`}>
+                        {n}
+                      </button>
+                    ))}
+                    <span className="text-[10px] font-bold text-[#C4A99A]">รายการ</span>
+                  </div>
+                </div>
+                {/* Right: page buttons */}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => paginate(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
+                    className="w-9 h-9 rounded-xl hover:bg-white border border-transparent hover:border-[#efebe9] disabled:opacity-30 text-[#885E43] flex items-center justify-center transition-all">
+                    <ChevronLeft size={16} />
                   </button>
-                ))}
-                <button onClick={() => paginate(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}
-                  className="w-9 h-9 rounded-xl hover:bg-white border border-transparent hover:border-[#efebe9] disabled:opacity-30 text-[#885E43] flex items-center justify-center transition-all">
-                  <ChevronRight size={16} />
-                </button>
+                  {getPages().map((p, i) => (
+                    p === '…'
+                      ? <span key={`e${i}`} className="w-9 text-center text-[#C4A99A] text-sm">…</span>
+                      : <button key={p} onClick={() => paginate(p)}
+                          className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${
+                            currentPage === p
+                              ? 'bg-[#372C2E] text-[#DE9E48] shadow-md'
+                              : 'text-[#A1887F] hover:bg-white hover:border hover:border-[#efebe9]'
+                          }`}>
+                          {p}
+                        </button>
+                  ))}
+                  <button onClick={() => paginate(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}
+                    className="w-9 h-9 rounded-xl hover:bg-white border border-transparent hover:border-[#efebe9] disabled:opacity-30 text-[#885E43] flex items-center justify-center transition-all">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
