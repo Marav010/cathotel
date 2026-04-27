@@ -12,6 +12,11 @@ export default function BookingForm({ onSaved, initialDate }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef(null);
 
+  // Cat name autocomplete state per cat index
+  const [catSuggestions, setCatSuggestions] = useState({}); // { [catIndex]: [{ cat_names, room_type }] }
+  const [showCatSuggestions, setShowCatSuggestions] = useState({}); // { [catIndex]: bool }
+  const catSuggestionRefs = useRef({});
+
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false, type: 'success', title: '', message: ''
   });
@@ -56,24 +61,70 @@ export default function BookingForm({ onSaved, initialDate }) {
     const handleClickOutside = (e) => {
       if (suggestionRef.current && !suggestionRef.current.contains(e.target))
         setShowSuggestions(false);
+      // Close cat suggestion dropdowns when clicking outside
+      Object.values(catSuggestionRefs.current).forEach(ref => {
+        if (ref && !ref.contains(e.target))
+          setShowCatSuggestions(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(k => updated[k] = false);
+            return updated;
+          });
+      });
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Search cat names from past bookings
+  const searchCatNames = async (index, value) => {
+    if (!value || value.length < 1) {
+      setCatSuggestions(prev => ({ ...prev, [index]: [] }));
+      return;
+    }
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('cat_names, room_type')
+      .ilike('cat_names', `%${value}%`)
+      .limit(6);
+    if (!error && data) {
+      // dedupe by cat_names
+      const seen = new Set();
+      const unique = data.filter(d => { if (seen.has(d.cat_names)) return false; seen.add(d.cat_names); return true; });
+      setCatSuggestions(prev => ({ ...prev, [index]: unique }));
+    }
+  };
+
   const selectCustomer = async (name) => {
     setFormData(prev => ({ ...prev, customer_name: name }));
     setShowSuggestions(false);
-    const { data: lastBooking } = await supabase
+
+    // Step 1: find the latest booking to get its start_date + end_date (= latest trip)
+    const { data: latestOne } = await supabase
       .from('bookings')
-      .select('cat_names, room_type')
+      .select('start_date, end_date, created_at')
       .eq('customer_name', name)
       .order('created_at', { ascending: false })
       .limit(1);
-    if (lastBooking && lastBooking.length > 0) {
-      const catsArray = lastBooking[0].cat_names.split(',').map(cat => ({
-        cat_name: cat.trim(),
-        room_type: lastBooking[0].room_type || 'สแตนดาร์ด'
+
+    if (!latestOne || latestOne.length === 0) return;
+
+    const { start_date, end_date } = latestOne[0];
+
+    // Step 2: fetch ALL bookings from that same trip (same dates)
+    // Each row in the DB = one booking record with its own room
+    const { data: tripBookings } = await supabase
+      .from('bookings')
+      .select('cat_names, room_type')
+      .eq('customer_name', name)
+      .eq('start_date', start_date)
+      .eq('end_date', end_date)
+      .order('created_at', { ascending: true });
+
+    if (tripBookings && tripBookings.length > 0) {
+      // Each DB row = one cat card (cat_names may be "น้องA,น้องB" if they share a room)
+      const catsArray = tripBookings.map(row => ({
+        cat_name: row.cat_names,
+        room_type: row.room_type || 'สแตนดาร์ด'
       }));
       setFormData(prev => ({ ...prev, cats: catsArray }));
     }
@@ -277,15 +328,50 @@ export default function BookingForm({ onSaved, initialDate }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {/* Cat name */}
-                          <div className="relative">
+                          {/* Cat name with autocomplete */}
+                          <div className="relative" ref={el => catSuggestionRefs.current[index] = el}>
                             <input
                               className="booking-input"
                               placeholder="ชื่อน้องแมว"
                               required
                               value={cat.cat_name}
-                              onChange={e => updateCatData(index, 'cat_name', e.target.value)}
+                              onFocus={() => {
+                                setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
+                                searchCatNames(index, cat.cat_name);
+                              }}
+                              onChange={e => {
+                                updateCatData(index, 'cat_name', e.target.value);
+                                setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
+                                searchCatNames(index, e.target.value);
+                              }}
                             />
+                            {/* Cat autocomplete dropdown */}
+                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && (
+                              <div className="absolute z-[300] w-full mt-1 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
+                                <div className="px-3 py-1.5 bg-[#FDFBFA] border-b border-[#f5f0ec]">
+                                  <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">น้องแมวที่เคยพัก</span>
+                                </div>
+                                {catSuggestions[index].map((item, i) => (
+                                  <button
+                                    key={i} type="button"
+                                    onClick={() => {
+                                      updateCatData(index, 'cat_name', item.cat_names);
+                                      updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
+                                      setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
+                                    }}
+                                    className="w-full px-3 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-2.5 transition-colors border-b border-[#f5f0ec] last:border-0"
+                                  >
+                                    <div className="w-7 h-7 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
+                                      <Cat size={13} className="text-[#885E43]" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-[#372C2E] text-sm truncate">{item.cat_names}</div>
+                                      <div className="text-[10px] text-[#A1887F] font-semibold">{item.room_type}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {/* Room type */}
