@@ -188,7 +188,7 @@ export default function BookingForm({ onSaved, initialDate }) {
     setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
   };
 
-  
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (bookingSummary.nights <= 0)
       return showAlert('warning', 'วันที่ไม่ถูกต้อง', 'วันออกต้องหลังจากวันเข้าพักอย่างน้อย 1 คืน');
