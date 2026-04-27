@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import {
   ChevronDown, Banknote, Cat, Plus, Trash2,
@@ -16,6 +17,8 @@ export default function BookingForm({ onSaved, initialDate }) {
   const [catSuggestions, setCatSuggestions] = useState({}); // { [catIndex]: [{ cat_names, room_type }] }
   const [showCatSuggestions, setShowCatSuggestions] = useState({}); // { [catIndex]: bool }
   const catSuggestionRefs = useRef({});
+  const catInputRefs = useRef({});
+  const [catDropdownPos, setCatDropdownPos] = useState({});
 
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false, type: 'success', title: '', message: ''
@@ -305,11 +308,11 @@ export default function BookingForm({ onSaved, initialDate }) {
                   return (
                     <div
                       key={index}
-                      className="cat-card-in relative rounded-2xl border transition-all"
+                      className="cat-card-in relative rounded-2xl border overflow-hidden transition-all"
                       style={{ borderColor: roomCfg.color + '30', background: roomCfg.accent || '#FDFBFA' }}
                     >
                       {/* Color strip */}
-                      <div className="h-1 w-full rounded-t-2xl" style={{ background: roomCfg.color }} />
+                      <div className="h-1 w-full" style={{ background: roomCfg.color }} />
 
                       <div className="p-4">
                         {/* Cat number label */}
@@ -331,30 +334,40 @@ export default function BookingForm({ onSaved, initialDate }) {
                           {/* Cat name with autocomplete */}
                           <div className="relative" ref={el => catSuggestionRefs.current[index] = el}>
                             <input
+                              ref={el => catInputRefs.current[index] = el}
                               className="booking-input"
                               placeholder="ชื่อน้องแมว"
                               required
                               value={cat.cat_name}
                               onFocus={() => {
+                                const rect = catInputRefs.current[index]?.getBoundingClientRect();
+                                if (rect) setCatDropdownPos(prev => ({ ...prev, [index]: { top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width } }));
                                 setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
                                 searchCatNames(index, cat.cat_name);
                               }}
                               onChange={e => {
                                 updateCatData(index, 'cat_name', e.target.value);
+                                const rect = catInputRefs.current[index]?.getBoundingClientRect();
+                                if (rect) setCatDropdownPos(prev => ({ ...prev, [index]: { top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width } }));
                                 setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
                                 searchCatNames(index, e.target.value);
                               }}
+                              onBlur={() => setTimeout(() => setShowCatSuggestions(prev => ({ ...prev, [index]: false })), 150)}
                             />
-                            {/* Cat autocomplete dropdown */}
-                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && (
-                              <div className="absolute z-[300] w-full mt-1 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
+                            {/* Cat autocomplete dropdown rendered via portal to escape overflow:hidden */}
+                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && catDropdownPos[index] && createPortal(
+                              <div
+                                style={{ position: 'absolute', top: catDropdownPos[index].top, left: catDropdownPos[index].left, width: catDropdownPos[index].width, zIndex: 9999 }}
+                                className="bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden"
+                              >
                                 <div className="px-3 py-1.5 bg-[#FDFBFA] border-b border-[#f5f0ec]">
                                   <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">น้องแมวที่เคยพัก</span>
                                 </div>
                                 {catSuggestions[index].map((item, i) => (
                                   <button
                                     key={i} type="button"
-                                    onClick={() => {
+                                    onMouseDown={e => {
+                                      e.preventDefault();
                                       updateCatData(index, 'cat_name', item.cat_names);
                                       updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
                                       setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
@@ -370,7 +383,8 @@ export default function BookingForm({ onSaved, initialDate }) {
                                     </div>
                                   </button>
                                 ))}
-                              </div>
+                              </div>,
+                              document.body
                             )}
                           </div>
 
