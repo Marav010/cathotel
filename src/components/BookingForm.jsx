@@ -305,11 +305,11 @@ export default function BookingForm({ onSaved, initialDate }) {
                   return (
                     <div
                       key={index}
-                      className="cat-card-in relative rounded-2xl border overflow-hidden transition-all"
+                      className="cat-card-in relative rounded-2xl border transition-all"
                       style={{ borderColor: roomCfg.color + '30', background: roomCfg.accent || '#FDFBFA' }}
                     >
                       {/* Color strip */}
-                      <div className="h-1 w-full" style={{ background: roomCfg.color }} />
+                      <div className="h-1 w-full rounded-t-2xl" style={{ background: roomCfg.color }} />
 
                       <div className="p-4">
                         {/* Cat number label */}
