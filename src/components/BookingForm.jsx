@@ -12,11 +12,6 @@ export default function BookingForm({ onSaved, initialDate }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef(null);
 
-  // Cat name autocomplete state (per cat index)
-  const [catSuggestions, setCatSuggestions] = useState({});   // { index: [{cat_name, room_type, customer_name}] }
-  const [showCatSuggestions, setShowCatSuggestions] = useState({});
-  const catSuggestionRefs = useRef({});
-
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false, type: 'success', title: '', message: ''
   });
@@ -61,15 +56,6 @@ export default function BookingForm({ onSaved, initialDate }) {
     const handleClickOutside = (e) => {
       if (suggestionRef.current && !suggestionRef.current.contains(e.target))
         setShowSuggestions(false);
-      // ปิด cat suggestions ถ้าคลิกนอก
-      setShowCatSuggestions(prev => {
-        const next = { ...prev };
-        Object.keys(catSuggestionRefs.current).forEach(idx => {
-          if (catSuggestionRefs.current[idx] && !catSuggestionRefs.current[idx].contains(e.target))
-            next[idx] = false;
-        });
-        return next;
-      });
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -78,37 +64,19 @@ export default function BookingForm({ onSaved, initialDate }) {
   const selectCustomer = async (name) => {
     setFormData(prev => ({ ...prev, customer_name: name }));
     setShowSuggestions(false);
-
-    // ดึง booking ล่าสุด โดยหา start_date ของ booking ล่าสุดก่อน
-    const { data: latestRow } = await supabase
-      .from('bookings')
-      .select('start_date')
-      .eq('customer_name', name)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (!latestRow || latestRow.length === 0) return;
-
-    const lastStartDate = latestRow[0].start_date;
-
-    // ดึงทุก booking ที่มี start_date เดียวกัน (= การจองครั้งเดียวกัน)
-    const { data: bookings } = await supabase
+    const { data: lastBooking } = await supabase
       .from('bookings')
       .select('cat_names, room_type')
       .eq('customer_name', name)
-      .eq('start_date', lastStartDate)
-      .order('created_at', { ascending: true });
-
-    if (!bookings || bookings.length === 0) return;
-
-    // แต่ละ row = แมวที่อยู่ห้องเดียวกัน (cat_names อาจมีหลายตัวถ้าอยู่รวมกัน)
-    // แยก row ออกเป็น cat card แต่ละใบ
-    const catsArray = bookings.map(row => ({
-      cat_name: row.cat_names,   // เก็บชื่อรวมไว้ตามเดิม (อาจเป็น "น้องA,น้องB" ถ้าอยู่ห้องเดียวกัน)
-      room_type: row.room_type || 'สแตนดาร์ด'
-    }));
-
-    setFormData(prev => ({ ...prev, cats: catsArray }));
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (lastBooking && lastBooking.length > 0) {
+      const catsArray = lastBooking[0].cat_names.split(',').map(cat => ({
+        cat_name: cat.trim(),
+        room_type: lastBooking[0].room_type || 'สแตนดาร์ด'
+      }));
+      setFormData(prev => ({ ...prev, cats: catsArray }));
+    }
   };
 
   const bookingSummary = useMemo(() => {
@@ -150,42 +118,6 @@ export default function BookingForm({ onSaved, initialDate }) {
     const newCats = [...formData.cats];
     newCats[i][field] = value;
     setFormData(prev => ({ ...prev, cats: newCats }));
-  };
-
-  // ค้นหาชื่อแมวจาก bookings
-  const searchCatName = async (index, value) => {
-    if (value.length < 1) {
-      setCatSuggestions(prev => ({ ...prev, [index]: [] }));
-      return;
-    }
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('cat_names, room_type, customer_name, start_date')
-      .ilike('cat_names', `%${value}%`)
-      .order('created_at', { ascending: false })
-      .limit(8);
-
-    if (!error && data) {
-      // กรองซ้ำโดยใช้ cat_names + customer_name เป็น key
-      const seen = new Set();
-      const unique = data.filter(row => {
-        const key = `${row.cat_names}__${row.customer_name}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      setCatSuggestions(prev => ({ ...prev, [index]: unique }));
-    }
-  };
-
-  const selectCat = (index, item) => {
-    updateCatData(index, 'cat_name', item.cat_names);
-    updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
-    // ถ้ายังไม่ได้ใส่ชื่อลูกค้า ให้ใส่อัตโนมัติ
-    if (!formData.customer_name) {
-      setFormData(prev => ({ ...prev, customer_name: item.customer_name }));
-    }
-    setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
   };
 
   const handleSubmit = async (e) => {
@@ -322,11 +254,11 @@ export default function BookingForm({ onSaved, initialDate }) {
                   return (
                     <div
                       key={index}
-                      className="cat-card-in relative rounded-2xl border transition-all"
+                      className="cat-card-in relative rounded-2xl border overflow-hidden transition-all"
                       style={{ borderColor: roomCfg.color + '30', background: roomCfg.accent || '#FDFBFA' }}
                     >
                       {/* Color strip */}
-                      <div className="h-1 w-full rounded-t-2xl" style={{ background: roomCfg.color }} />
+                      <div className="h-1 w-full" style={{ background: roomCfg.color }} />
 
                       <div className="p-4">
                         {/* Cat number label */}
@@ -345,54 +277,15 @@ export default function BookingForm({ onSaved, initialDate }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {/* Cat name with autocomplete */}
-                          <div
-                            className="relative"
-                            ref={el => catSuggestionRefs.current[index] = el}
-                          >
+                          {/* Cat name */}
+                          <div className="relative">
                             <input
                               className="booking-input"
                               placeholder="ชื่อน้องแมว"
                               required
                               value={cat.cat_name}
-                              onFocus={() => {
-                                if (cat.cat_name.length >= 1)
-                                  setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
-                              }}
-                              onChange={e => {
-                                updateCatData(index, 'cat_name', e.target.value);
-                                setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
-                                searchCatName(index, e.target.value);
-                              }}
+                              onChange={e => updateCatData(index, 'cat_name', e.target.value)}
                             />
-
-                            {/* Cat autocomplete dropdown */}
-                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && (
-                              <div className="absolute z-[300] left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden max-h-56 overflow-y-auto">
-                                <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec] sticky top-0">
-                                  <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">
-                                    แมวที่เคยเข้าพัก
-                                  </span>
-                                </div>
-                                {catSuggestions[index].map((item, idx) => (
-                                  <button
-                                    key={idx} type="button"
-                                    onClick={() => selectCat(index, item)}
-                                    className="w-full px-4 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0"
-                                  >
-                                    <div className="w-7 h-7 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
-                                      <Cat size={13} className="text-[#885E43]" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-[#372C2E] text-xs truncate">{item.cat_names}</p>
-                                      <p className="text-[10px] text-[#A1887F] font-medium truncate">
-                                        {item.customer_name} · {item.room_type}
-                                      </p>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
                           </div>
 
                           {/* Room type */}
