@@ -368,8 +368,8 @@ export default function BookingForm({ onSaved, initialDate }) {
 
                             {/* Cat autocomplete dropdown */}
                             {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && (
-                              <div className="absolute z-[300] w-max min-w-full max-w-xs mt-2 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
-                                <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec]">
+                              <div className="absolute z-[300] left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden max-h-56 overflow-y-auto">
+                                <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec] sticky top-0">
                                   <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">
                                     แมวที่เคยเข้าพัก
                                   </span>
@@ -378,15 +378,15 @@ export default function BookingForm({ onSaved, initialDate }) {
                                   <button
                                     key={idx} type="button"
                                     onClick={() => selectCat(index, item)}
-                                    className="w-full px-4 py-3 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0"
+                                    className="w-full px-4 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0"
                                   >
-                                    <div className="w-8 h-8 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
-                                      <Cat size={14} className="text-[#885E43]" />
+                                    <div className="w-7 h-7 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
+                                      <Cat size={13} className="text-[#885E43]" />
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="font-bold text-[#372C2E] text-sm truncate">{item.cat_names}</p>
+                                      <p className="font-bold text-[#372C2E] text-xs truncate">{item.cat_names}</p>
                                       <p className="text-[10px] text-[#A1887F] font-medium truncate">
-                                        เจ้าของ: {item.customer_name} · {item.room_type}
+                                        {item.customer_name} · {item.room_type}
                                       </p>
                                     </div>
                                   </button>
