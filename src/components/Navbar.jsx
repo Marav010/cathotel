@@ -1,4 +1,4 @@
-import { Calendar, PlusCircle, History, BarChart3, LogOut, Users, PawPrint, Sparkles, ShoppingBag } from 'lucide-react';
+import { Calendar, PlusCircle, History, BarChart3, LogOut, Users, PawPrint, Sparkles } from 'lucide-react';
 import NavNotif from './NavNotif';
 
 export default function Navbar({ activeTab, setActiveTab, onLogout }) {
@@ -8,7 +8,6 @@ export default function Navbar({ activeTab, setActiveTab, onLogout }) {
     { id: 'playtracker', label: 'รอบปล่อยเล่น',  icon: <PawPrint size={17} /> },
     { id: 'history',     label: 'ประวัติการจอง',  icon: <History size={17} /> },
     { id: 'customers',   label: 'ข้อมูลลูกค้า',   icon: <Users size={17} /> },
-    { id: 'shop',        label: 'จัดการร้านค้า',  icon: <ShoppingBag size={17} /> },
     { id: 'report',      label: 'รายงานสรุป',     icon: <BarChart3 size={17} /> },
     { id: 'ai',          label: 'AI ผู้ช่วย',     icon: <Sparkles size={17} />, special: true },
   ];

@@ -232,6 +232,8 @@ export default function CustomerDatabase() {
         {/* Gold divider */}
         <div className="divider-gold" />
 
+        {/* ── </div>
+
         {/* ── Customer Cards Grid ── */}
         {filtered.length === 0 ? (
           <div className="py-20 text-center bg-white rounded-[2rem] border border-[#efebe9]">

@@ -20,7 +20,7 @@ const MONTHS = [
   'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
   'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'
 ];
-// Years derived dynamically from bookings data
+const YEARS = [2024, 2025, 2026];
 
 export default function ReportSummary() {
   const reportRef = useRef();
@@ -30,7 +30,6 @@ export default function ReportSummary() {
     totalRevenue: 0, totalBookings: 0,
     yearlyRevenue: 0, yearlyBookings: 0, roomStats: []
   });
-  const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
@@ -42,8 +41,6 @@ export default function ReportSummary() {
     setLoading(true);
     const { data: bookings, error } = await supabase.from('bookings').select('*');
     if (error) { console.error(error); setLoading(false); return; }
-
-    setAllBookings(bookings || []);
 
     const filtered = (bookings || []).filter(b => {
       const d = new Date(b.start_date);
@@ -134,11 +131,7 @@ export default function ReportSummary() {
               <div className="relative">
                 <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="rpt-select">
                   <option value="all">ทุกปี</option>
-                  {(() => {
-                    const years = [...new Set(allBookings.map(b => new Date(b.start_date).getFullYear()).filter(Boolean))].sort((a,b) => b-a);
-                    if (years.length === 0) years.push(now.getFullYear());
-                    return years.map(y => <option key={y} value={y}>{y}</option>);
-                  })()}
+                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <ChevronRight size={12} className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-[#A1887F] pointer-events-none" />
               </div>
