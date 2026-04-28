@@ -361,7 +361,7 @@ async function saveFeedback(type, question, answer) {
 export default function AIAssistant() {
   const [model, setModel]       = useState(OPENROUTER_FREE_MODELS[0].id);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงจิง AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nตอนนี้ผมเชื่อมต่อกับฐานข้อมูลครบทุกตารางแล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
+    { role: 'assistant', content: 'สวัสดีครับ! 🐱 ผมจิงจิง AI ผู้ช่วยของโรงแรมแมวจริงใจ\n\nผมพร้อมรับใช้แล้วครับ ถามได้เลย เช่น:\n• บ้านไหนพักอยู่ตอนนี้?\n• เบอร์ 08X-XXX คือของใคร?\n• มัดจำบ้านนี้จ่ายครบยัง?\n• รอบปล่อยเล่นวันนี้บ้านไหนยังไม่ปล่อย?\n• เดือนนี้รายรับรวมเท่าไหร่?' }
   ]);
   const [input, setInput]       = useState('');
   const [loading, setLoading]   = useState(false);
