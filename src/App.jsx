@@ -12,7 +12,6 @@ import UserHome from './components/UserHome';
 import UserCalendar from './components/UserCalendar';
 import UserNavbar from './components/UserNavbar';
 import AIAssistant from './components/AIAssistant';
-import AdminShop from './components/AdminShop';
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const IS_ADMIN_DOMAIN = window.location.hostname.includes('admin');
@@ -133,7 +132,6 @@ function App() {
           {activeTab === 'playtracker' && <PlayTracker />}
           {activeTab === 'history'     && <HistoryTable />}
           {activeTab === 'customers'   && <CustomerDatabase />}
-          {activeTab === 'shop'        && <AdminShop />}
           {activeTab === 'report'      && <ReportSummary />}
           {activeTab === 'ai'          && <AIAssistant />}
         </div>
