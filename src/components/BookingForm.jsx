@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import {
   ChevronDown, Banknote, Cat, Plus, Trash2,
   CheckCircle2, XCircle, Wallet, Check, User,
-  CalendarDays, Sparkles, AlertTriangle, ChevronsRight
+  AlertTriangle, Phone
 } from 'lucide-react';
 
 export default function BookingForm({ onSaved, initialDate }) {
@@ -12,13 +11,8 @@ export default function BookingForm({ onSaved, initialDate }) {
   const [customerSuggestions, setCustomerSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef(null);
-
-  // Cat name autocomplete state per cat index
-  const [catSuggestions, setCatSuggestions] = useState({}); // { [catIndex]: [{ cat_names, room_type }] }
-  const [showCatSuggestions, setShowCatSuggestions] = useState({}); // { [catIndex]: bool }
-  const catSuggestionRefs = useRef({});
-  const catInputRefs = useRef({});
-  const [catDropdownPos, setCatDropdownPos] = useState({});
+  const [catSuggestions, setCatSuggestions] = useState({});
+  const [showCatSuggestions, setShowCatSuggestions] = useState({});
 
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false, type: 'success', title: '', message: ''
@@ -39,19 +33,20 @@ export default function BookingForm({ onSaved, initialDate }) {
 
   const [formData, setFormData] = useState({
     customer_name: '',
+    phone: '',
     start_date: initialDate || '',
     end_date: '',
     is_deposited: false,
     cats: [{ cat_name: '', room_type: 'สแตนดาร์ด' }]
   });
 
-  // Customer autocomplete
+  // ── Customer autocomplete ──────────────────────────────────────────────
   useEffect(() => {
     const search = async () => {
       if (formData.customer_name.length < 1) { setCustomerSuggestions([]); return; }
       const { data, error } = await supabase
         .from('customers')
-        .select('customer_name')
+        .select('customer_name, phone')
         .ilike('customer_name', `%${formData.customer_name}%`)
         .limit(5);
       if (!error && data) setCustomerSuggestions(data);
@@ -64,75 +59,81 @@ export default function BookingForm({ onSaved, initialDate }) {
     const handleClickOutside = (e) => {
       if (suggestionRef.current && !suggestionRef.current.contains(e.target))
         setShowSuggestions(false);
-      // Close cat suggestion dropdowns when clicking outside
-      Object.values(catSuggestionRefs.current).forEach(ref => {
-        if (ref && !ref.contains(e.target))
-          setShowCatSuggestions(prev => {
-            const updated = { ...prev };
-            Object.keys(updated).forEach(k => updated[k] = false);
-            return updated;
-          });
-      });
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Search cat names from past bookings
+  // ── FIX: selectCustomer — ดึงทุก row ของ booking วันล่าสุด ──────────────
+  const selectCustomer = async (name, phone) => {
+    setFormData(prev => ({ ...prev, customer_name: name, phone: phone || prev.phone }));
+    setShowSuggestions(false);
+
+    // หา start_date ล่าสุดของลูกค้านี้ก่อน
+    const { data: latestBooking } = await supabase
+      .from('bookings')
+      .select('start_date')
+      .eq('customer_name', name)
+      .order('start_date', { ascending: false })
+      .limit(1);
+
+    if (!latestBooking || latestBooking.length === 0) return;
+
+    const latestDate = latestBooking[0].start_date;
+
+    // ดึง *ทุก* row ที่มี start_date เดียวกัน (แมวแต่ละตัวในห้องต่างกัน = หลาย rows)
+    const { data: allRows } = await supabase
+      .from('bookings')
+      .select('cat_names, room_type')
+      .eq('customer_name', name)
+      .eq('start_date', latestDate);
+
+    if (allRows && allRows.length > 0) {
+      const catsArray = [];
+      allRows.forEach(row => {
+        const names = row.cat_names.split(',').map(n => n.trim()).filter(Boolean);
+        names.forEach(n => catsArray.push({ cat_name: n, room_type: row.room_type || 'สแตนดาร์ด' }));
+      });
+      setFormData(prev => ({ ...prev, cats: catsArray }));
+    }
+  };
+
+  // ── Cat name autocomplete ──────────────────────────────────────────────
   const searchCatNames = async (index, value) => {
     if (!value || value.length < 1) {
       setCatSuggestions(prev => ({ ...prev, [index]: [] }));
       return;
     }
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('bookings')
-      .select('cat_names, room_type')
+      .select('cat_names, room_type, customer_name')
       .ilike('cat_names', `%${value}%`)
-      .limit(6);
-    if (!error && data) {
-      // dedupe by cat_names
-      const seen = new Set();
-      const unique = data.filter(d => { if (seen.has(d.cat_names)) return false; seen.add(d.cat_names); return true; });
-      setCatSuggestions(prev => ({ ...prev, [index]: unique }));
-    }
-  };
-
-  const selectCustomer = async (name) => {
-    setFormData(prev => ({ ...prev, customer_name: name }));
-    setShowSuggestions(false);
-
-    // Step 1: find the latest booking to get its start_date + end_date (= latest trip)
-    const { data: latestOne } = await supabase
-      .from('bookings')
-      .select('start_date, end_date, created_at')
-      .eq('customer_name', name)
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(20);
 
-    if (!latestOne || latestOne.length === 0) return;
-
-    const { start_date, end_date } = latestOne[0];
-
-    // Step 2: fetch ALL bookings from that same trip (same dates)
-    // Each row in the DB = one booking record with its own room
-    const { data: tripBookings } = await supabase
-      .from('bookings')
-      .select('cat_names, room_type')
-      .eq('customer_name', name)
-      .eq('start_date', start_date)
-      .eq('end_date', end_date)
-      .order('created_at', { ascending: true });
-
-    if (tripBookings && tripBookings.length > 0) {
-      // Each DB row = one cat card (cat_names may be "น้องA,น้องB" if they share a room)
-      const catsArray = tripBookings.map(row => ({
-        cat_name: row.cat_names,
-        room_type: row.room_type || 'สแตนดาร์ด'
-      }));
-      setFormData(prev => ({ ...prev, cats: catsArray }));
-    }
+    if (!data) return;
+    const seen = new Set();
+    const results = [];
+    data.forEach(row => {
+      row.cat_names.split(',').forEach(n => {
+        const name = n.trim();
+        if (name.toLowerCase().includes(value.toLowerCase()) && !seen.has(name)) {
+          seen.add(name);
+          results.push({ cat_name: name, room_type: row.room_type, customer_name: row.customer_name });
+        }
+      });
+    });
+    setCatSuggestions(prev => ({ ...prev, [index]: results.slice(0, 5) }));
   };
 
+  const selectCatSuggestion = (index, item) => {
+    updateCatData(index, 'cat_name', item.cat_name);
+    updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
+    setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
+    setCatSuggestions(prev => ({ ...prev, [index]: [] }));
+  };
+
+  // ── Summary ────────────────────────────────────────────────────────────
   const bookingSummary = useMemo(() => {
     let nights = 0;
     if (formData.start_date && formData.end_date) {
@@ -174,6 +175,7 @@ export default function BookingForm({ onSaved, initialDate }) {
     setFormData(prev => ({ ...prev, cats: newCats }));
   };
 
+  // ── Submit ─────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (bookingSummary.nights <= 0)
@@ -183,7 +185,10 @@ export default function BookingForm({ onSaved, initialDate }) {
     try {
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
-        .upsert({ customer_name: formData.customer_name }, { onConflict: 'customer_name' })
+        .upsert(
+          { customer_name: formData.customer_name, phone: formData.phone || '' },
+          { onConflict: 'customer_name' }
+        )
         .select('id')
         .single();
 
@@ -223,7 +228,6 @@ export default function BookingForm({ onSaved, initialDate }) {
 
   return (
     <>
-
       <div className="max-w-2xl mx-auto py-4 md:py-8 px-2 md:px-4 font-sans form-slide-up">
 
         {/* ── Hero Header ── */}
@@ -242,17 +246,15 @@ export default function BookingForm({ onSaved, initialDate }) {
           </div>
         </div>
 
-        {/* Gold divider */}
         <div className="divider-gold mb-6" />
 
-        {/* ── Form Card ── */}
         <div className="bg-white rounded-[2.5rem] border border-[#efebe9] shadow-xl shadow-[#372C2E]/5 overflow-visible">
           <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8">
 
-            {/* ─── 1. ชื่อเจ้าของแมว ─── */}
-            <div className="relative" ref={suggestionRef}>
-              <label className="section-label">👤 ชื่อเจ้าของแมว</label>
-              <div className="relative">
+            {/* ─── 1. ชื่อเจ้าของแมว + เบอร์โทร ─── */}
+            <div className="space-y-4">
+              <div className="relative" ref={suggestionRef}>
+                <label className="section-label">👤 ชื่อเจ้าของแมว</label>
                 <input
                   className="booking-input"
                   placeholder="ระบุชื่อลูกค้า"
@@ -264,40 +266,49 @@ export default function BookingForm({ onSaved, initialDate }) {
                     setShowSuggestions(true);
                   }}
                 />
+                {showSuggestions && customerSuggestions.length > 0 && (
+                  <div className="absolute z-[200] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
+                    <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec]">
+                      <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">ลูกค้าที่เคยใช้บริการ</span>
+                    </div>
+                    {customerSuggestions.map((item, idx) => (
+                      <button key={idx} type="button"
+                        onClick={() => selectCustomer(item.customer_name, item.phone)}
+                        className="w-full px-4 py-3 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
+                          <User size={14} className="text-[#885E43]" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#372C2E] text-sm">{item.customer_name}</p>
+                          {item.phone && <p className="text-[10px] text-[#A1887F]">{item.phone}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Autocomplete dropdown */}
-              {showSuggestions && customerSuggestions.length > 0 && (
-                <div className="absolute z-[200] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
-                  <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec]">
-                    <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">
-                      ลูกค้าที่เคยใช้บริการ
-                    </span>
-                  </div>
-                  {customerSuggestions.map((item, idx) => (
-                    <button
-                      key={idx} type="button"
-                      onClick={() => selectCustomer(item.customer_name)}
-                      className="w-full px-4 py-3 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
-                        <User size={14} className="text-[#885E43]" />
-                      </div>
-                      <span className="font-bold text-[#372C2E] text-sm">{item.customer_name}</span>
-                    </button>
-                  ))}
+              <div>
+                <label className="section-label">📞 เบอร์โทรศัพท์</label>
+                <div className="relative">
+                  <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C4A99A] pointer-events-none" />
+                  <input
+                    className="booking-input pl-10"
+                    placeholder="0xx-xxx-xxxx (ไม่บังคับ)"
+                    value={formData.phone}
+                    onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  />
                 </div>
-              )}
+              </div>
             </div>
 
             {/* ─── 2. น้องแมว ─── */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="section-label mb-0">🐱 รายละเอียดน้องแมว</label>
-                <button
-                  type="button" onClick={addCatField}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#372C2E] hover:bg-[#5D4037] text-white rounded-xl text-[11px] font-black transition-all active:scale-95 shadow-md"
-                >
+                <button type="button" onClick={addCatField}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#372C2E] hover:bg-[#5D4037] text-white rounded-xl text-[11px] font-black transition-all active:scale-95 shadow-md">
                   <Plus size={13} /> เพิ่มน้องแมว
                 </button>
               </div>
@@ -306,95 +317,66 @@ export default function BookingForm({ onSaved, initialDate }) {
                 {formData.cats.map((cat, index) => {
                   const roomCfg = ROOM_CONFIG[cat.room_type] || {};
                   return (
-                    <div
-                      key={index}
-                      className="cat-card-in relative rounded-2xl border overflow-hidden transition-all"
-                      style={{ borderColor: roomCfg.color + '30', background: roomCfg.accent || '#FDFBFA' }}
-                    >
-                      {/* Color strip */}
+                    <div key={index}
+                      className="cat-card-in relative rounded-2xl border overflow-visible transition-all"
+                      style={{ borderColor: roomCfg.color + '30', background: roomCfg.accent || '#FDFBFA' }}>
                       <div className="h-1 w-full" style={{ background: roomCfg.color }} />
-
                       <div className="p-4">
-                        {/* Cat number label */}
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: roomCfg.color }}>
                             น้องแมว #{index + 1}
                           </span>
                           {formData.cats.length > 1 && (
-                            <button
-                              type="button" onClick={() => removeCatField(index)}
-                              className="w-7 h-7 rounded-full bg-white border border-red-100 text-red-400 hover:text-red-600 hover:border-red-200 flex items-center justify-center transition-all shadow-sm"
-                            >
+                            <button type="button" onClick={() => removeCatField(index)}
+                              className="w-7 h-7 rounded-full bg-white border border-red-100 text-red-400 hover:text-red-600 hover:border-red-200 flex items-center justify-center transition-all shadow-sm">
                               <Trash2 size={13} />
                             </button>
                           )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {/* Cat name with autocomplete */}
-                          <div className="relative" ref={el => catSuggestionRefs.current[index] = el}>
+                          {/* Cat name + autocomplete */}
+                          <div className="relative">
                             <input
-                              ref={el => catInputRefs.current[index] = el}
                               className="booking-input"
                               placeholder="ชื่อน้องแมว"
                               required
                               value={cat.cat_name}
+                              autoComplete="off"
                               onFocus={() => {
-                                const rect = catInputRefs.current[index]?.getBoundingClientRect();
-                                if (rect) setCatDropdownPos(prev => ({ ...prev, [index]: { top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width } }));
                                 setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
-                                searchCatNames(index, cat.cat_name);
-                              }}
-                              onChange={e => {
-                                updateCatData(index, 'cat_name', e.target.value);
-                                const rect = catInputRefs.current[index]?.getBoundingClientRect();
-                                if (rect) setCatDropdownPos(prev => ({ ...prev, [index]: { top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: rect.width } }));
-                                setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
-                                searchCatNames(index, e.target.value);
+                                if (cat.cat_name) searchCatNames(index, cat.cat_name);
                               }}
                               onBlur={() => setTimeout(() => setShowCatSuggestions(prev => ({ ...prev, [index]: false })), 150)}
+                              onChange={e => {
+                                updateCatData(index, 'cat_name', e.target.value);
+                                searchCatNames(index, e.target.value);
+                                setShowCatSuggestions(prev => ({ ...prev, [index]: true }));
+                              }}
                             />
-                            {/* Cat autocomplete dropdown rendered via portal to escape overflow:hidden */}
-                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && catDropdownPos[index] && createPortal(
-                              <div
-                                style={{ position: 'absolute', top: catDropdownPos[index].top, left: catDropdownPos[index].left, width: catDropdownPos[index].width, zIndex: 9999 }}
-                                className="bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden"
-                              >
-                                <div className="px-3 py-1.5 bg-[#FDFBFA] border-b border-[#f5f0ec]">
+                            {showCatSuggestions[index] && catSuggestions[index]?.length > 0 && (
+                              <div className="absolute z-[300] w-full mt-1.5 bg-white rounded-2xl shadow-2xl border border-[#efebe9] overflow-hidden">
+                                <div className="px-4 py-2 bg-[#FDFBFA] border-b border-[#f5f0ec]">
                                   <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-widest">น้องแมวที่เคยพัก</span>
                                 </div>
                                 {catSuggestions[index].map((item, i) => (
-                                  <button
-                                    key={i} type="button"
-                                    onMouseDown={e => {
-                                      e.preventDefault();
-                                      updateCatData(index, 'cat_name', item.cat_names);
-                                      updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
-                                      setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
-                                    }}
-                                    className="w-full px-3 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-2.5 transition-colors border-b border-[#f5f0ec] last:border-0"
-                                  >
-                                    <div className="w-7 h-7 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0">
-                                      <Cat size={13} className="text-[#885E43]" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="font-bold text-[#372C2E] text-sm truncate">{item.cat_names}</div>
-                                      <div className="text-[10px] text-[#A1887F] font-semibold">{item.room_type}</div>
+                                  <button key={i} type="button"
+                                    onMouseDown={() => selectCatSuggestion(index, item)}
+                                    className="w-full px-4 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-3 transition-colors border-b border-[#f5f0ec] last:border-0">
+                                    <div className="w-7 h-7 rounded-xl bg-[#f5e6d8] flex items-center justify-center shrink-0 text-sm">🐱</div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-bold text-[#372C2E] text-sm">{item.cat_name}</p>
+                                      <p className="text-[10px] text-[#A1887F] truncate">{item.customer_name} · {item.room_type}</p>
                                     </div>
                                   </button>
                                 ))}
-                              </div>,
-                              document.body
+                              </div>
                             )}
                           </div>
 
-                          {/* Room type */}
                           <div className="relative">
-                            <select
-                              className="room-select"
-                              value={cat.room_type}
-                              onChange={e => updateCatData(index, 'room_type', e.target.value)}
-                            >
+                            <select className="room-select" value={cat.room_type}
+                              onChange={e => updateCatData(index, 'room_type', e.target.value)}>
                               {Object.entries(ROOM_CONFIG).map(([type, cfg]) => (
                                 <option key={type} value={type}>{type} (฿{cfg.price}/คืน)</option>
                               ))}
@@ -403,7 +385,6 @@ export default function BookingForm({ onSaved, initialDate }) {
                           </div>
                         </div>
 
-                        {/* Room price badge */}
                         <div className="mt-2.5 flex items-center gap-1.5">
                           <div className="w-2 h-2 rounded-full" style={{ background: roomCfg.color }} />
                           <span className="text-[10px] font-black" style={{ color: roomCfg.color }}>
@@ -419,71 +400,47 @@ export default function BookingForm({ onSaved, initialDate }) {
 
             {/* ─── 3. วันที่ + มัดจำ ─── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Dates */}
               <div>
                 <label className="section-label">ระยะเวลาเข้าพัก</label>
                 <div className="bg-[#FDFBFA] rounded-2xl border border-[#efebe9] overflow-hidden divide-y divide-[#f0ece8]">
                   <div className="flex items-center gap-3 px-4 py-1">
                     <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-wider w-16 shrink-0">เช็คอิน</span>
-                    <input
-                      type="date" required
+                    <input type="date" required
                       className="flex-1 py-3 bg-transparent outline-none font-bold text-[#372C2E] text-sm border-0"
                       value={formData.start_date}
-                      onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                    />
+                      onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} />
                   </div>
                   <div className="flex items-center gap-3 px-4 py-1">
                     <span className="text-[10px] font-black text-[#A1887F] uppercase tracking-wider w-16 shrink-0">เช็คเอาท์</span>
-                    <input
-                      type="date" required
+                    <input type="date" required
                       className="flex-1 py-3 bg-transparent outline-none font-bold text-[#372C2E] text-sm border-0"
                       value={formData.end_date}
-                      onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                    />
+                      onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))} />
                   </div>
                 </div>
-
-                {/* Nights badge */}
                 {bookingSummary.nights > 0 && (
                   <div className="mt-2 flex items-center gap-1.5 px-1">
-                    <span className="f-number text-[#885E43]" style={{ fontSize: "1.2rem" }}>
-                      {bookingSummary.nights}</span>
-                  <span className="text-xs font-bold text-[#A1887F]"> คืน
-                    </span>
+                    <span className="f-number text-[#885E43]" style={{ fontSize: "1.2rem" }}>{bookingSummary.nights}</span>
+                    <span className="text-xs font-bold text-[#A1887F]"> คืน</span>
                   </div>
                 )}
               </div>
 
-              {/* Deposit toggle */}
               <div>
                 <label className="section-label">สถานะเงินมัดจำ</label>
                 <div className="bg-[#FDFBFA] p-1.5 rounded-2xl border border-[#efebe9] flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, is_deposited: false }))}
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, is_deposited: false }))}
                     className={`flex-1 py-3.5 rounded-xl text-xs font-black transition-all duration-200 ${
-                      !formData.is_deposited
-                        ? 'bg-white shadow-md text-[#372C2E] border border-[#efebe9]'
-                        : 'text-[#A1887F] hover:text-[#885E43]'
-                    }`}
-                  >
+                      !formData.is_deposited ? 'bg-white shadow-md text-[#372C2E] border border-[#efebe9]' : 'text-[#A1887F] hover:text-[#885E43]'}`}>
                     ยังไม่มัดจำ
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, is_deposited: true }))}
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, is_deposited: true }))}
                     className={`flex-1 py-3.5 rounded-xl text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 ${
-                      formData.is_deposited
-                        ? 'bg-[#885E43] text-white shadow-lg shadow-[#885E43]/25'
-                        : 'text-[#A1887F] hover:text-[#885E43]'
-                    }`}
-                  >
+                      formData.is_deposited ? 'bg-[#885E43] text-white shadow-lg shadow-[#885E43]/25' : 'text-[#A1887F] hover:text-[#885E43]'}`}>
                     {formData.is_deposited && <Check size={13} />}
                     มัดจำแล้ว ✓
                   </button>
                 </div>
-
-                {/* Deposit amount preview */}
                 {formData.is_deposited && (
                   <div className="mt-2 px-3 py-2 bg-[#885E43]/8 rounded-xl border border-[#885E43]/15 flex items-center justify-between">
                     <span className="text-[10px] font-black text-[#885E43] uppercase tracking-wider">ยอดมัดจำ</span>
@@ -495,8 +452,25 @@ export default function BookingForm({ onSaved, initialDate }) {
 
             {/* ─── 4. Price Summary ─── */}
             <div className="bg-[#372C2E] rounded-[2rem] overflow-hidden shadow-2xl shadow-[#372C2E]/20">
-              {/* Price rows */}
               <div className="px-7 pt-6 pb-4 space-y-3 border-b border-white/8">
+                {/* Per-cat breakdown when multiple cats */}
+                {formData.cats.length > 1 && bookingSummary.nights > 0 && (
+                  <div className="space-y-1 pb-3 border-b border-white/10">
+                    {formData.cats.map((cat, i) => {
+                      const p = ROOM_PRICES[cat.room_type] || 0;
+                      return (
+                        <div key={i} className="flex items-center justify-between">
+                          <span className="text-[11px] text-white/40 font-bold">
+                            {cat.cat_name || `แมว #${i+1}`} ({cat.room_type})
+                          </span>
+                          <span className="text-[11px] text-white/50 font-bold">
+                            ฿{(p * bookingSummary.nights).toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-white/50 uppercase tracking-wider">
                     ค่าห้องรวม ({bookingSummary.nights} คืน)
@@ -516,8 +490,6 @@ export default function BookingForm({ onSaved, initialDate }) {
                   </div>
                 )}
               </div>
-
-              {/* Main amount */}
               <div className="px-7 py-6 flex items-end justify-between relative overflow-hidden">
                 <div>
                   <p className="text-xs font-black text-white/30 uppercase tracking-[0.25em] mb-2">
@@ -537,20 +509,14 @@ export default function BookingForm({ onSaved, initialDate }) {
             </div>
 
             {/* ─── Submit ─── */}
-            <button
-              type="submit"
-              disabled={loading}
+            <button type="submit" disabled={loading}
               className="w-full py-5 rounded-2xl font-black text-base transition-all flex items-center justify-center gap-3 shadow-xl active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: loading ? '#C4A99A' : 'linear-gradient(135deg, #885E43 0%, #5D4037 100%)',
                 color: 'white',
                 boxShadow: loading ? 'none' : '0 8px 24px rgba(136,94,67,0.35)',
-              }}
-            >
-              {loading
-                ? <><span className="animate-spin text-xl">🐱</span> กำลังบันทึก...</>
-                : <><CheckCircle2 size={22} /> ยืนยันการจอง</>
-              }
+              }}>
+              {loading ? <><span className="animate-spin text-xl">🐱</span> กำลังบันทึก...</> : <><CheckCircle2 size={22} /> ยืนยันการจอง</>}
             </button>
 
           </form>
@@ -559,40 +525,21 @@ export default function BookingForm({ onSaved, initialDate }) {
 
       {/* ── Alert Modal ── */}
       {alertConfig.isOpen && (
-        <div
-          className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) closeAlert(); }}
-        >
+        <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeAlert(); }}>
           <div className="modal-pop bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl border border-[#efebe9]">
-            {/* Header band */}
-            <div className={`h-2 w-full ${
-              alertConfig.type === 'success' ? 'bg-emerald-400' :
-              alertConfig.type === 'warning' ? 'bg-amber-400' : 'bg-red-400'
-            }`} />
-
+            <div className={`h-2 w-full ${alertConfig.type === 'success' ? 'bg-emerald-400' : alertConfig.type === 'warning' ? 'bg-amber-400' : 'bg-red-400'}`} />
             <div className="p-8 text-center">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 ${
-                alertConfig.type === 'success' ? 'bg-emerald-50'  :
-                alertConfig.type === 'warning' ? 'bg-amber-50'    : 'bg-red-50'
-              }`}>
-                {alertConfig.type === 'success'
-                  ? <CheckCircle2 size={40} className="text-emerald-500" />
-                  : alertConfig.type === 'warning'
-                  ? <AlertTriangle size={40} className="text-amber-500" />
-                  : <XCircle size={40} className="text-red-500" />
-                }
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 ${alertConfig.type === 'success' ? 'bg-emerald-50' : alertConfig.type === 'warning' ? 'bg-amber-50' : 'bg-red-50'}`}>
+                {alertConfig.type === 'success' ? <CheckCircle2 size={40} className="text-emerald-500" />
+                  : alertConfig.type === 'warning' ? <AlertTriangle size={40} className="text-amber-500" />
+                  : <XCircle size={40} className="text-red-500" />}
               </div>
-
               <h3 className="text-xl font-black text-[#372C2E] mb-2">{alertConfig.title}</h3>
-              <p className="text-sm text-[#A1887F] font-medium leading-relaxed px-2 mb-8">
-                {alertConfig.message}
-              </p>
-
-              <button
-                onClick={closeAlert}
+              <p className="text-sm text-[#A1887F] font-medium leading-relaxed px-2 mb-8">{alertConfig.message}</p>
+              <button onClick={closeAlert}
                 className="w-full py-4 rounded-2xl font-black text-white transition-all active:scale-[0.98]"
-                style={{ background: 'linear-gradient(135deg, #885E43, #5D4037)' }}
-              >
+                style={{ background: 'linear-gradient(135deg, #885E43, #5D4037)' }}>
                 ตกลง
               </button>
             </div>

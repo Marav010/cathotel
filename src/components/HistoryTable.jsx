@@ -208,7 +208,11 @@ export default function HistoryTable() {
               className="filter-select"
             >
               <option value="all">ทุกปี</option>
-              {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+              {(() => {
+                const years = [...new Set(bookings.map(b => new Date(b.start_date).getFullYear()).filter(Boolean))].sort((a,b) => b-a);
+                if (years.length === 0) years.push(new Date().getFullYear());
+                return years.map(y => <option key={y} value={y}>{y}</option>);
+              })()}
             </select>
             <ChevronRight size={12} className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-[#A1887F] pointer-events-none" />
           </div>
