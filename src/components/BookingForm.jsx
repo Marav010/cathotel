@@ -86,7 +86,7 @@ export default function BookingForm({ onSaved, initialDate }) {
     }
     const { data, error } = await supabase
       .from('bookings')
-      .select('cat_names, room_type')
+      .select('cat_names, room_type, customer_name')
       .ilike('cat_names', `%${value}%`)
       .limit(6);
     if (!error && data) {
@@ -370,6 +370,7 @@ export default function BookingForm({ onSaved, initialDate }) {
                                       e.preventDefault();
                                       updateCatData(index, 'cat_name', item.cat_names);
                                       updateCatData(index, 'room_type', item.room_type || 'สแตนดาร์ด');
+                                      if (item.customer_name) setFormData(prev => ({ ...prev, customer_name: item.customer_name }));
                                       setShowCatSuggestions(prev => ({ ...prev, [index]: false }));
                                     }}
                                     className="w-full px-3 py-2.5 text-left hover:bg-[#FDF8F5] flex items-center gap-2.5 transition-colors border-b border-[#f5f0ec] last:border-0"
